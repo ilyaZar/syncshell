@@ -45,8 +45,13 @@ Panel {
   property bool noticeShown: false
   readonly property var folderRows: buildFolderRows()
   readonly property bool compactFolders: folderRows.length >= 5
+  readonly property string displayedFolderId: compactFolders
+    && visibleSyncActivity !== "" && syncthing
+    && folderById(syncthing.syncActivityFolderId)
+    ? syncthing.syncActivityFolderId : selectedFolderId
   readonly property var visibleFolderRows: compactFolders
-    ? (selectedFolder() ? [selectedFolder()] : []) : folderRows
+    ? (folderById(displayedFolderId) ? [folderById(displayedFolderId)] : [])
+    : folderRows
   readonly property var pendingOfferRows: pendingOfferOptions()
   readonly property double trackedBytes: folderTotal("globalBytes")
   readonly property int trackedFiles: folderTotal("globalFiles")
@@ -188,12 +193,6 @@ Panel {
 
   function folderById(folderId) {
     return PanelModel.folderById(folderRows, folderId)
-  }
-
-  function selectActiveFolder() {
-    if (!compactFolders || visibleSyncActivity === "" || !syncthing) return
-    var activeFolder = folderById(syncthing.syncActivityFolderId)
-    if (activeFolder) selectedFolderId = activeFolder.id
   }
 
   function ensureFolderSelection() {
@@ -459,10 +458,7 @@ Panel {
 
   onSyncthingChanged: configureService()
   onSettingsChanged: configureService()
-  onFolderRowsChanged: {
-    ensureFolderSelection()
-    selectActiveFolder()
-  }
+  onFolderRowsChanged: ensureFolderSelection()
   onPendingOfferRowsChanged: ensurePendingOfferSelection()
   onVisibleNoticeChanged: {
     if (visibleNotice !== "") {
@@ -480,7 +476,6 @@ Panel {
     if (opened) {
       if (syncthing) syncthing.refresh()
       ensureFolderSelection()
-      selectActiveFolder()
       popup.scrollToTop()
       Qt.callLater(function() { popup.focusPanel() })
     } else if (!preserveStateForFolderPicker) {
@@ -541,10 +536,6 @@ Panel {
       if (root.syncthing.folderMutationError !== "") {
         root.addSubmissionPending = false
       }
-    }
-
-    function onSyncActivityFolderIdChanged() {
-      root.selectActiveFolder()
     }
   }
 

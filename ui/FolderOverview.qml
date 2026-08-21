@@ -40,7 +40,7 @@ Column {
     height: Style.space(28)
     showLabel: false
     rowHeight: Style.space(28)
-    value: root.controller.selectedFolderId
+    value: root.controller.displayedFolderId
     options: root.controller.folderOptions()
     foreground: root.foreground
     fontFamily: root.fontFamily
@@ -59,7 +59,7 @@ Column {
         width: parent.width
         folder: modelData
         selected: String(modelData.id || "")
-          === root.controller.selectedFolderId
+          === root.controller.displayedFolderId
         mutationBusy: root.syncthing
           ? root.syncthing.folderMutationBusy : false
         stateLabel: root.controller.folderState(modelData)

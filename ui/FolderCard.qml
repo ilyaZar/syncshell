@@ -32,60 +32,48 @@ BorderSurface {
   signal forgetRequested
   signal copyIdRequested(string folderId)
 
-  implicitHeight: nameBadge.implicitHeight + details.implicitHeight
+  implicitHeight: nameActions.implicitHeight + details.implicitHeight
     + Style.space(14)
-  color: rowMouse.containsMouse
-    ? Style.hoverFillFor(cardBorderColor, Color.accent) : "transparent"
+  color: "transparent"
   borderSpec: Border.controlSpec(
     selected ? "focus" : "normal", cardBorderColor, Color.accent)
   radius: Style.cornerRadius
 
-  MouseArea {
-    id: rowMouse
-    anchors.fill: parent
-    enabled: root.canOpen
-    hoverEnabled: true
-    cursorShape: root.canOpen ? Qt.PointingHandCursor : Qt.ArrowCursor
-    onClicked: root.openRequested()
-  }
-
-  BorderSurface {
-    id: nameBadge
+  Row {
+    id: nameActions
     z: 1
     anchors.left: parent.left
     anchors.top: parent.top
-    width: Math.min(nameText.implicitWidth + copyIdButton.width
-      + Style.space(16),
-      parent.width - stateBadge.width - Style.space(8))
-    implicitHeight: nameText.implicitHeight + Style.space(6)
-    height: implicitHeight
-    color: "transparent"
-    borderSpec: Border.withWidth(Border.controlSpec(
-      "normal", root.cardBorderColor, Color.accent), "0 1 1 0")
-    radius: 0
+    spacing: Style.space(2)
 
-    Text {
-      id: nameText
-      anchors.fill: parent
-      anchors.leftMargin: Style.space(8)
-      anchors.rightMargin: copyIdButton.width + Style.space(4)
+    Button {
+      id: openFolderButton
+      width: Math.min(implicitWidth, Math.max(Style.space(48),
+        root.width - stateBadge.width - copyIdButton.width
+          - nameActions.spacing - Style.space(8)))
+      clip: true
+      iconText: "\uf07b"
       text: String(root.folder.label || "Unnamed folder")
-      color: root.foreground
-      font.family: root.fontFamily
-      font.pixelSize: Style.font.body
-      font.bold: true
-      verticalAlignment: Text.AlignVCenter
-      elide: Text.ElideRight
+      tooltipText: root.canOpen
+        ? "Open " + String(root.folder.path || "") : "Folder unavailable"
+      bordered: true
+      leftAlign: true
+      foreground: root.foreground
+      fontFamily: root.fontFamily
+      fontSize: Style.font.body
+      iconSize: Style.font.body
+      horizontalPadding: Style.space(6)
+      verticalPadding: Style.space(2)
+      enabled: root.canOpen
+      onClicked: root.openRequested()
     }
 
     PanelActionButton {
       id: copyIdButton
-      anchors.right: parent.right
-      anchors.rightMargin: Style.space(2)
-      anchors.verticalCenter: parent.verticalCenter
-      size: Style.space(18)
+      size: openFolderButton.implicitHeight
       iconText: "󰆏"
       tooltipText: "Copy folder ID"
+      bordered: true
       foreground: root.foreground
       fontFamily: root.fontFamily
       fontSize: Style.font.caption
@@ -100,7 +88,7 @@ BorderSurface {
     anchors.top: parent.top
     implicitWidth: stateText.implicitWidth + Style.space(10)
     width: implicitWidth
-    height: nameBadge.height
+    height: nameActions.height
     color: "transparent"
     borderSpec: Border.withWidth(Border.controlSpec(
       "normal", root.stateColor, Color.accent), "0 0 1 1")
@@ -122,7 +110,7 @@ BorderSurface {
     z: 1
     anchors.left: parent.left
     anchors.right: parent.right
-    anchors.top: nameBadge.bottom
+    anchors.top: nameActions.bottom
     anchors.leftMargin: Style.space(8)
     anchors.rightMargin: root.folder.paused
       ? forgetButton.width + Style.space(14) : Style.space(8)

@@ -13,11 +13,6 @@ Column {
   property color success: "#a3be8c"
   property color syncColor: "#26B6DB"
   property string fontFamily: Style.font.family
-  readonly property bool popupOpen: selector.popupOpen
-
-  function closePopup() {
-    if (selector.popupOpen) selector.close()
-  }
 
   width: parent ? parent.width : implicitWidth
   spacing: Style.space(8)
@@ -31,20 +26,6 @@ Column {
     font.family: root.fontFamily
     font.pixelSize: Style.font.body
     horizontalAlignment: Text.AlignHCenter
-  }
-
-  ToggleDropdown {
-    id: selector
-    visible: root.controller.compactFolders
-    width: parent.width
-    height: Style.space(28)
-    showLabel: false
-    rowHeight: Style.space(28)
-    value: root.controller.displayedFolderId
-    options: root.controller.folderOptions()
-    foreground: root.foreground
-    fontFamily: root.fontFamily
-    onChanged: function(value) { root.controller.selectedFolderId = value }
   }
 
   Column {

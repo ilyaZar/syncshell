@@ -18,7 +18,6 @@ KeyboardPanel {
   }
 
   function closeTransientPopups() {
-    folderOverview.closePopup()
     moreDetails.closePopups()
     addForm.closePopups()
   }
@@ -44,8 +43,8 @@ KeyboardPanel {
   PanelKeyCatcher {
     id: keyCatcher
     anchors.fill: parent
-    blocked: root.controller.addOpen || folderOverview.popupOpen
-      || moreDetails.folderPopupOpen || moreDetails.pendingPopupOpen
+    blocked: root.controller.addOpen || moreDetails.folderPopupOpen
+      || moreDetails.pendingPopupOpen
     onCloseRequested: {
       if (root.controller.removalConfirmOpen) {
         root.controller.removalConfirmOpen = false

@@ -38,7 +38,6 @@ Column {
     ToggleDropdown {
       id: folderSelector
       visible: root.controller.folderRows.length > 0
-        && !root.controller.compactFolders
       Layout.fillWidth: true
       Layout.preferredHeight: Style.space(28)
       showLabel: false

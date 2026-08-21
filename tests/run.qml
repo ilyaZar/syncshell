@@ -131,6 +131,41 @@ QtObject {
       "optiplex-sff", "host name fallback")
   }
 
+  function testPendingFolderOffers() {
+    var offer = {
+      localDeviceId: "local",
+      devices: [{ deviceID: "remote", name: "pixel" }],
+      pendingFolders: {
+        "shared-folder": {
+          offeredBy: {
+            remote: { label: "Shared folder" }
+          }
+        }
+      }
+    }
+    compare(PanelModel.pendingOfferOptions(offer), [{
+      value: JSON.stringify(["shared-folder", "remote"]),
+      label: "Shared folder from pixel"
+    }], "pending folder option")
+    compare(FolderModel.offerSnapshotError({
+      id: "shared-folder", pendingDeviceId: "remote"
+    }, offer.pendingFolders), "", "current folder offer")
+    compare(FolderModel.offerSnapshotError({
+      id: "shared-folder", pendingDeviceId: "missing"
+    }, offer.pendingFolders),
+      "The selected remote folder offer is no longer available",
+      "stale folder offer")
+
+    offer.pendingFolders["shared-folder"].offeredBy.remote.receiveEncrypted = true
+    compare(PanelModel.pendingOfferOptions(offer), [],
+      "encrypted folder offer hidden")
+    compare(FolderModel.offerSnapshotError({
+      id: "shared-folder", pendingDeviceId: "remote"
+    }, offer.pendingFolders),
+      "Encrypted folder offers must be accepted in the Syncthing Web UI",
+      "encrypted folder offer rejected")
+  }
+
   function testSettings() {
     var parsed = SettingsModel.parse([
       "# Syncthing plugin preferences",
@@ -168,6 +203,7 @@ QtObject {
       testActivityStates()
       testNestedIndexedState()
       testModels()
+      testPendingFolderOffers()
       testSettings()
       console.log("all tests passed")
       Qt.exit(0)

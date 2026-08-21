@@ -14,7 +14,11 @@ test_settings() {
   local target="$test_root/settings/config/settings.toml"
   bash "$root/scripts/syncthing-settings.sh" ensure \
     "$root/config/settings.toml" "$target" themed >/dev/null
-  grep -q '^icon_style = "themed"' "$target" \
+  grep -q '^version = 1$' "$target" \
+    || fail "settings version was not seeded"
+  grep -q '^\[style\]$' "$target" \
+    || fail "style section was not seeded"
+  grep -Eq '^icon_style[[:space:]]*=[[:space:]]*"themed"' "$target" \
     || fail "legacy icon choice was not seeded"
   printf '%s\n' '# user-owned' >"$target"
   bash "$root/scripts/syncthing-settings.sh" ensure \

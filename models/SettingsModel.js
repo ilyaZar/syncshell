@@ -2,6 +2,7 @@
 
 var DefaultIconStyle = "branded"
 var DefaultWebUiTheme = "omarchy"
+var SupportedVersion = 1
 
 function stripComment(line) {
   var quote = ""
@@ -24,20 +25,59 @@ function parseValue(raw) {
   return match ? match[2] : null
 }
 
+function parseVersion(raw) {
+  var value = String(raw || "").trim()
+  return /^(0|[1-9][0-9]*)$/.test(value) ? Number(value) : null
+}
+
 function parse(raw) {
   var values = ({})
   var lines = String(raw || "").split("\n")
+  var section = ""
+  var version = null
+  var structured = false
+  var styleSectionSeen = false
+  var rootStyleSetting = false
 
   for (var i = 0; i < lines.length; i++) {
     var line = stripComment(lines[i]).trim()
     if (!line) continue
+    var header = line.match(/^\[([A-Za-z_][A-Za-z0-9_-]*)\]$/)
+    if (header) {
+      structured = true
+      section = header[1]
+      if (section !== "style") {
+        return { error: "Unknown settings section " + section
+          + " on line " + (i + 1) }
+      }
+      if (styleSectionSeen) {
+        return { error: "Duplicate settings section style on line " + (i + 1) }
+      }
+      styleSectionSeen = true
+      continue
+    }
     var assignment = line.match(/^([A-Za-z_][A-Za-z0-9_-]*)\s*=\s*(.+)$/)
     if (!assignment) {
       return { error: "Invalid settings syntax on line " + (i + 1) }
     }
     var key = assignment[1]
+    if (key === "version" && !section) {
+      structured = true
+      if (version !== null) {
+        return { error: "Duplicate setting version on line " + (i + 1) }
+      }
+      version = parseVersion(assignment[2])
+      if (version === null) {
+        return { error: "version must be an integer" }
+      }
+      continue
+    }
     if (key !== "icon_style" && key !== "web_ui_theme") {
-      return { error: "Unknown setting " + key + " on line " + (i + 1) }
+      return { error: "Unknown setting " + (section ? section + "." : "")
+        + key + " on line " + (i + 1) }
+    }
+    if (!section) {
+      rootStyleSetting = true
     }
     if (values[key] !== undefined) {
       return { error: "Duplicate setting " + key + " on line " + (i + 1) }
@@ -47,6 +87,17 @@ function parse(raw) {
       return { error: key + " must use a quoted value" }
     }
     values[key] = value
+  }
+
+  if (structured) {
+    if (version === null) return { error: "Missing setting version" }
+    if (version !== SupportedVersion) {
+      return { error: "Unsupported settings version " + version }
+    }
+    if (!styleSectionSeen) return { error: "Missing settings section style" }
+    if (rootStyleSetting) {
+      return { error: "Style settings must be inside [style]" }
+    }
   }
 
   if (values.icon_style === undefined) {

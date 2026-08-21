@@ -1,2 +1,5 @@
-icon_style = "branded" # branded: classic Syncthing icons; themed: Omarchy-colored icons
+version = 1
+
+[style]
+icon_style   = "branded" # branded: classic Syncthing icons; themed: Omarchy-colored icons
 web_ui_theme = "omarchy" # default: Syncthing styling; omarchy: follows the active Omarchy theme

@@ -169,14 +169,25 @@ QtObject {
   function testSettings() {
     var parsed = SettingsModel.parse([
       "# Syncthing plugin preferences",
-      "icon_style = \"themed\" # follows the Omarchy palette",
+      "version = 1",
+      "",
+      "[style]",
+      "icon_style   = \"themed\" # follows the Omarchy palette",
       "web_ui_theme = 'default' # keep the Syncthing Web UI"
     ].join("\n"))
     compare(parsed, {
       error: "",
       iconStyle: "themed",
       webUiTheme: "default"
-    }, "commented settings")
+    }, "versioned settings")
+    compare(SettingsModel.parse([
+      "icon_style = \"branded\"",
+      "web_ui_theme = \"omarchy\""
+    ].join("\n")), {
+      error: "",
+      iconStyle: "branded",
+      webUiTheme: "omarchy"
+    }, "legacy flat settings")
     compare(SettingsModel.defaults(true), {
       iconStyle: "themed",
       webUiTheme: "omarchy"
@@ -196,6 +207,22 @@ QtObject {
       "web_ui_theme = \"omarchy\""
     ].join("\n")).error,
       "Duplicate setting icon_style on line 2", "duplicate setting")
+    compare(SettingsModel.parse([
+      "version = 2",
+      "",
+      "[style]",
+      "icon_style = \"branded\"",
+      "web_ui_theme = \"omarchy\""
+    ].join("\n")).error,
+      "Unsupported settings version 2", "unsupported settings version")
+    compare(SettingsModel.parse([
+      "version = 1",
+      "icon_style = \"branded\"",
+      "",
+      "[style]",
+      "web_ui_theme = \"omarchy\""
+    ].join("\n")).error,
+      "Style settings must be inside [style]", "unscoped style setting")
   }
 
   Component.onCompleted: {

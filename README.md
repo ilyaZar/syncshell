@@ -39,10 +39,12 @@ starts `syncthing.service`.
 The settings menu opens
 `~/.config/omarchy/ilyazar.syncthing/settings.toml` in the default editor. The
 file is created only when it is first opened, and changes apply when saved.
+New files use configuration version `1`, with appearance options grouped under
+the `[style]` section. Existing files are never overwritten.
 
-- `icon_style = "branded"` uses the classic Syncthing bar icon. Use `themed`
-  for an icon colored by the active Omarchy theme.
-- `web_ui_theme = "omarchy"` applies the complete Omarchy palette to
+- `style.icon_style = "branded"` uses the classic Syncthing bar icon. Use
+  `themed` for an icon colored by the active Omarchy theme.
+- `style.web_ui_theme = "omarchy"` applies the complete Omarchy palette to
   Syncthing's Web UI. Use `default` for Syncthing's own styling.
 
 Changing the Omarchy theme regenerates the Web UI palette immediately. Refresh

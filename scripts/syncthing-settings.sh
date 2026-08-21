@@ -27,7 +27,7 @@ if [[ ! -e $target ]]; then
 
   temporary=$(mktemp --tmpdir="$target_dir" .settings.toml.XXXXXX)
   trap 'rm -f -- "$temporary"' EXIT
-  sed "s/^icon_style = \"branded\"/icon_style = \"$icon_style\"/" \
+  sed -E "s/^(icon_style[[:space:]]*=[[:space:]]*)\"branded\"/\1\"$icon_style\"/" \
     "$template" >"$temporary"
   chmod 600 -- "$temporary"
   mv -- "$temporary" "$target"

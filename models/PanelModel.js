@@ -163,6 +163,18 @@ function deviceName(devices, deviceId) {
   return "Unknown device"
 }
 
+function localDeviceName(syncthing, fallback) {
+  var id = String(syncthing && syncthing.localDeviceId || "")
+  var devices = syncthing && syncthing.devices ? syncthing.devices : []
+  for (var i = 0; i < devices.length; i++) {
+    var device = devices[i] || ({})
+    if (String(device.deviceID || "") === id && device.name) {
+      return String(device.name)
+    }
+  }
+  return String(fallback || "This device")
+}
+
 function deviceOptions(syncthing) {
   var options = []
   var devices = syncthing && syncthing.devices ? syncthing.devices : []

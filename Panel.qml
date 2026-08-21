@@ -110,32 +110,30 @@ Panel {
     ? syncthing.syncActivityAction : ""
   readonly property string visibleSyncDetail: syncthing
     ? syncthing.syncActivityDetail : ""
-  readonly property string heroMeta: {
-    if (!syncthing) return "Service unavailable"
-    if (syncthing.installationState === "missing") {
-      return "Syncthing is not installed"
-    }
-    if (syncthing.installationState === "incomplete") {
-      return "Installation needs cleanup"
-    }
-    if (syncthing.serviceAvailable && !syncthing.serviceActive) {
-      return "Syncing stopped"
-    }
-    if (syncthing.phase === "discovering") return "Finding local service"
-    if (syncthing.phase === "loading") return "Reading folder health"
-    if (syncthing.phase === "error") return "Local service unavailable"
-    if (hasProblems) return syncthing.folderProblemCount + " folder"
-      + (syncthing.folderProblemCount === 1 ? " needs" : "s need")
-      + " attention"
-    if (root.visibleSyncActivity !== "") return "Synchronizing"
-    if (syncthing.syncingFolderCount > 0) return syncthing.syncingFolderCount
-      + " folder" + (syncthing.syncingFolderCount === 1 ? " is" : "s are")
-      + " syncing"
-    if (scanningFolderCount > 0) return scanningFolderCount + " folder"
-      + (scanningFolderCount === 1 ? " is" : "s are") + " scanning"
-    if (pausedFolderCount > 0) return pausedFolderCount + " folder"
-      + (pausedFolderCount === 1 ? " is" : "s are") + " paused"
-    return "Everything synchronized"
+  readonly property string localDeviceName: PanelModel.localDeviceName(
+    syncthing, Quickshell.env("HOSTNAME"))
+
+  function showNotice(message) {
+    displayedNotice = message
+    noticeShown = true
+    noticeFadeTimer.stop()
+    noticeDisplayTimer.restart()
+  }
+
+  function copyToClipboard(value, notice) {
+    var text = String(value || "")
+    if (!text) return
+    Quickshell.execDetached(["wl-copy", "--", text])
+    showNotice(notice)
+  }
+
+  function copyLocalDeviceId() {
+    copyToClipboard(syncthing ? syncthing.localDeviceId : "",
+      "Device ID copied")
+  }
+
+  function copyFolderId(folderId) {
+    copyToClipboard(folderId, "Folder ID copied")
   }
 
   function configureService() {
@@ -462,10 +460,7 @@ Panel {
   onPendingOfferRowsChanged: ensurePendingOfferSelection()
   onVisibleNoticeChanged: {
     if (visibleNotice !== "") {
-      displayedNotice = visibleNotice
-      noticeShown = true
-      noticeFadeTimer.stop()
-      noticeDisplayTimer.restart()
+      showNotice(visibleNotice)
     } else if (displayedNotice !== "") {
       noticeDisplayTimer.stop()
       noticeShown = false

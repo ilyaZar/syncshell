@@ -34,7 +34,8 @@ Column {
       id: hero
       width: parent.width
       title: "Syncthing"
-      meta: root.controller.heroMeta
+      meta: root.controller.localDeviceName
+        + (root.syncthing && root.syncthing.localDeviceId ? "  󰆏" : "")
       foreground: root.foreground
       fontFamily: root.fontFamily
       iconOpacity: root.syncthing && root.syncthing.serviceActive
@@ -65,6 +66,26 @@ Column {
             fontFamily: hero.fontFamily
           }
         }
+      }
+    }
+
+    MouseArea {
+      id: copyDeviceId
+      anchors.left: hero.left
+      anchors.leftMargin: hero.iconSize + Style.space(14)
+      anchors.right: hero.right
+      anchors.rightMargin: hero.trailingInset
+      anchors.bottom: hero.bottom
+      height: Style.space(18)
+      enabled: root.syncthing && root.syncthing.localDeviceId !== ""
+      hoverEnabled: enabled
+      cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
+      onClicked: root.controller.copyLocalDeviceId()
+
+      PanelToolTip {
+        visible: copyDeviceId.containsMouse
+        text: "Copy Syncthing device ID"
+        fontFamily: root.fontFamily
       }
     }
   }

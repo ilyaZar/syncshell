@@ -122,6 +122,13 @@ QtObject {
     }, "local", function(path) { return path })
     compare(config.devices.map(function(device) { return device.deviceID }),
       ["local", "remote"], "configured devices")
+
+    compare(PanelModel.localDeviceName({
+      localDeviceId: "local",
+      devices: [{ deviceID: "local", name: "optiplex" }]
+    }, "fallback"), "optiplex", "configured local device name")
+    compare(PanelModel.localDeviceName(null, "optiplex-sff"),
+      "optiplex-sff", "host name fallback")
   }
 
   function testSettings() {

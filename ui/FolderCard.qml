@@ -30,6 +30,7 @@ BorderSurface {
 
   signal openRequested
   signal forgetRequested
+  signal copyIdRequested(string folderId)
 
   implicitHeight: nameBadge.implicitHeight + details.implicitHeight
     + Style.space(14)
@@ -53,7 +54,8 @@ BorderSurface {
     z: 1
     anchors.left: parent.left
     anchors.top: parent.top
-    width: Math.min(nameText.implicitWidth + Style.space(16),
+    width: Math.min(nameText.implicitWidth + copyIdButton.width
+      + Style.space(16),
       parent.width - stateBadge.width - Style.space(8))
     implicitHeight: nameText.implicitHeight + Style.space(6)
     height: implicitHeight
@@ -66,7 +68,7 @@ BorderSurface {
       id: nameText
       anchors.fill: parent
       anchors.leftMargin: Style.space(8)
-      anchors.rightMargin: Style.space(8)
+      anchors.rightMargin: copyIdButton.width + Style.space(4)
       text: String(root.folder.label || "Unnamed folder")
       color: root.foreground
       font.family: root.fontFamily
@@ -74,6 +76,20 @@ BorderSurface {
       font.bold: true
       verticalAlignment: Text.AlignVCenter
       elide: Text.ElideRight
+    }
+
+    PanelActionButton {
+      id: copyIdButton
+      anchors.right: parent.right
+      anchors.rightMargin: Style.space(2)
+      anchors.verticalCenter: parent.verticalCenter
+      size: Style.space(18)
+      iconText: "󰆏"
+      tooltipText: "Copy folder ID"
+      foreground: root.foreground
+      fontFamily: root.fontFamily
+      fontSize: Style.font.caption
+      onClicked: root.copyIdRequested(String(root.folder.id || ""))
     }
   }
 

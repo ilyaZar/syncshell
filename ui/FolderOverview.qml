@@ -58,6 +58,9 @@ Column {
         fontFamily: root.fontFamily
         onOpenRequested: root.controller.openFolder(modelData)
         onForgetRequested: root.controller.requestForget(modelData)
+        onCopyIdRequested: function(folderId) {
+          root.controller.copyFolderId(folderId)
+        }
       }
     }
   }

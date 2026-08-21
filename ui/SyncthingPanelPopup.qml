@@ -277,11 +277,11 @@ KeyboardPanel {
 
   Text {
     id: shortcutHint
-    anchors.left: parent.left
+    anchors.horizontalCenter: parent.horizontalCenter
     anchors.bottom: parent.bottom
     text: root.controller.settingsMenuOpen
       ? "MOVE (j/k)  SELECT (enter)"
-      : "REFRESH (r)  WEB UI (w)  START/STOP (p)  SETTINGS (s)"
+      : "[r]efresh [w]eb UI [p]ause / continue [s]ettings"
     color: root.controller.dim
     font.family: root.controller.fontFamily
     font.pixelSize: Style.font.caption

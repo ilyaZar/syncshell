@@ -385,6 +385,7 @@ Panel {
     closeTransientViews()
     settingsSelectedIndex = 0
     settingsMenuOpen = true
+    Qt.callLater(function() { popup.focusPanel() })
   }
 
   function closeSettingsMenu() {

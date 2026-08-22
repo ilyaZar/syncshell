@@ -116,6 +116,7 @@ KeyboardPanel {
 
     Flickable {
         id: panelFlick
+        parent: keyCatcher
         anchors.top: parent.top
         anchors.right: parent.right
         anchors.bottom: fixedActions.top
@@ -218,6 +219,9 @@ KeyboardPanel {
                 width: parent.width
                 selectedIndex: root.controller.settingsSelectedIndex
                 fontFamily: root.controller.fontFamily
+                onHighlightRequested: function (index) {
+                    root.controller.settingsSelectedIndex = index;
+                }
                 onActivated: function (index) {
                     root.controller.settingsSelectedIndex = index;
                     root.controller.activateSettingsSelection();
@@ -228,6 +232,7 @@ KeyboardPanel {
 
     Column {
         id: fixedActions
+        parent: keyCatcher
         visible: !root.controller.settingsMenuOpen
         height: visible ? implicitHeight : 0
         anchors.right: parent.right
@@ -279,9 +284,11 @@ KeyboardPanel {
 
     Text {
         id: shortcutHint
+        parent: keyCatcher
+        z: root.controller.removalConfirmOpen ? 12 : 0
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.bottom: parent.bottom
-        text: root.controller.settingsMenuOpen ? "MOVE (j/k)  SELECT (enter)" : "[r]efresh  [w]eb UI  [p]ause/continue  [s]ettings"
+        text: root.controller.settingsMenuOpen ? "MOVE (j/k or Up/Down)  SELECT (Enter)  BACK (q/Esc)" : "[r]efresh  [w]eb UI  [p]ause/continue  [s]ettings"
         color: root.controller.dim
         font.family: root.controller.fontFamily
         font.pixelSize: Style.font.caption
@@ -291,6 +298,7 @@ KeyboardPanel {
 
     CompactConfirmDialog {
         id: forgetDialog
+        parent: keyCatcher
         anchors.fill: parent
         opened: root.controller.forgetConfirmOpen
         z: 10
@@ -312,6 +320,7 @@ KeyboardPanel {
 
     SelfRemovalDialog {
         id: removalDialog
+        parent: keyCatcher
         anchors.fill: parent
         opened: root.controller.removalConfirmOpen
         busy: root.controller.syncthing ? root.controller.syncthing.settingsBusy : false

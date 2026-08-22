@@ -6,6 +6,7 @@ Item {
 
     property int selectedIndex: 0
     property string fontFamily: Style.font.family
+    signal highlightRequested(int index)
     signal activated(int index)
 
     readonly property var rows: [
@@ -104,7 +105,7 @@ Item {
                     anchors.fill: parent
                     hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
-                    onEntered: root.selectedIndex = menuRow.index
+                    onEntered: root.highlightRequested(menuRow.index)
                     onClicked: root.activated(menuRow.index)
                 }
             }

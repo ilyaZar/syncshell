@@ -23,7 +23,8 @@ omarchy plugin add https://github.com/ilyaZar/omarchy-syncthing.git --enable
 
 Open the widget and expand **More**. If Syncthing is missing, select **Install
 Syncthing**. The plugin runs `omarchy pkg add syncthing`, then enables and
-starts `syncthing.service`.
+starts `syncthing.service`. If Syncthing is already installed, the plugin should
+auto-detect this.
 
 ## Keybindings
 
@@ -56,17 +57,72 @@ Web UI applies the new colors without a page reload. The generated Omarchy theme
 is separate from Syncthing's default theme assets, so selecting `default` keeps
 Syncthing's styling and any user customization intact.
 
-## Demo
+## Demo videos
+
+Click a preview to play the video. These four walkthroughs cover live file
+activity, folder management, Web UI theming, and plugin settings.
 
 > [!WARNING] The Hyprland window to the left of the plugin is not part of the
 > plugin. It live-tracks changes in the `test-source` directory for the
 > demonstration.
 
-The two release demos show the current interface at a readable zoom while a
-floating terminal makes every filesystem change explicit:
-
-- [file activity](assets/published/01-syncthing-file-activity.mp4)
-- [unlink, link, and forget](assets/published/02-syncthing-folder-lifecycle.mp4)
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <a href="assets/published/01_syncthing_file_activity.mp4">
+        <img
+          src="assets/published/01_syncthing_file_activity.png"
+          alt="File activity and synchronization"
+        >
+      </a>
+      <p><strong>File activity</strong></p>
+      <p>
+        Copy and remove files while the panel reports live synchronization
+        activity.
+      </p>
+    </td>
+    <td width="50%" valign="top">
+      <a href="assets/published/02_syncthing_folder_lifecycle.mp4">
+        <img
+          src="assets/published/02_syncthing_folder_lifecycle.png"
+          alt="Unlink, link, and forget a folder"
+        >
+      </a>
+      <p><strong>Folder lifecycle</strong></p>
+      <p>
+        Unlink, relink, and forget a folder without deleting its local files.
+      </p>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <a href="assets/published/03_syncthing_theme_aware_webUI.mp4">
+        <img
+          src="assets/published/03_syncthing_theme_aware_webUI.png"
+          alt="Theme-aware Syncthing Web UI"
+        >
+      </a>
+      <p><strong>Theme-aware Web UI</strong></p>
+      <p>
+        Follow Omarchy theme changes in Syncthing's Web UI without reloading.
+      </p>
+    </td>
+    <td width="50%" valign="top">
+      <a
+        href="assets/published/04_syncthing_icon_change_and_other_settings.mp4"
+      >
+        <img
+          src="assets/published/04_syncthing_icon_change_and_other_settings.png"
+          alt="Syncthing icon and plugin settings"
+        >
+      </a>
+      <p><strong>Icon and settings</strong></p>
+      <p>
+        Switch the bar icon style and review the plugin's other settings.
+      </p>
+    </td>
+  </tr>
+</table>
 
 ### File activity
 

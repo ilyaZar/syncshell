@@ -1,8 +1,10 @@
 # Syncthing for Omarchy
 
-See Syncthing health and file activity from the Omarchy bar. The plugin can
-manage local folders, open Syncthing's Web UI, control the user service, and
-install the official Arch package.
+Syncshell (**Sync**thing + quick**shell**) is a plugin to show Syncthing file
+activity from the Omarchy bar. The plugin can manage local folders, open
+Syncthing's Web UI, control the user service, and many more. While originally
+developed on Omarchy, in its next release, it will be refactored to be used on
+any quickshell build, not only Omarchy.
 
 ![Syncthing status and installation controls](preview.png)
 
@@ -62,9 +64,10 @@ Syncthing's styling and any user customization intact.
 Click a preview to play the video. These four walkthroughs cover live file
 activity, folder management, Web UI theming, and plugin settings.
 
-> [!WARNING] The Hyprland window to the left of the plugin is not part of the
-> plugin. It live-tracks changes in the `test-source` directory for the
-> demonstration.
+<!-- prettier-ignore -->
+> [!WARNING]
+> The Hyprland window to the left of the plugin is not part of the plugin. It
+> live-tracks changes in the `test-source` directory for the demonstration.
 
 <table>
   <tr>

@@ -3,8 +3,8 @@
 Syncshell (**Sync**thing + quick**shell**) is a plugin to show Syncthing file
 activity from the Omarchy bar. The plugin can manage local folders, open
 Syncthing's Web UI, control the user service, and many more. While originally
-developed on Omarchy, in its next release, it will be refactored to be used on
-any quickshell build, not only Omarchy.
+developed for Omarchy its next release will refactor the plugin to be usable on
+any Linux quickshell build.
 
 ![Syncthing status and installation controls](preview.png)
 
@@ -72,7 +72,9 @@ activity, folder management, Web UI theming, and plugin settings.
 <table>
   <tr>
     <td width="50%" valign="top">
-      <a href="assets/published/01_syncthing_file_activity.mp4">
+      <a
+        href="https://ilyazar.github.io/syncshell/assets/published/01_syncthing_file_activity.mp4"
+      >
         <img
           src="assets/published/01_syncthing_file_activity.png"
           alt="File activity and synchronization"
@@ -85,7 +87,9 @@ activity, folder management, Web UI theming, and plugin settings.
       </p>
     </td>
     <td width="50%" valign="top">
-      <a href="assets/published/02_syncthing_folder_lifecycle.mp4">
+      <a
+        href="https://ilyazar.github.io/syncshell/assets/published/02_syncthing_folder_lifecycle.mp4"
+      >
         <img
           src="assets/published/02_syncthing_folder_lifecycle.png"
           alt="Unlink, link, and forget a folder"
@@ -99,7 +103,9 @@ activity, folder management, Web UI theming, and plugin settings.
   </tr>
   <tr>
     <td width="50%" valign="top">
-      <a href="assets/published/03_syncthing_theme_aware_webUI.mp4">
+      <a
+        href="https://ilyazar.github.io/syncshell/assets/published/03_syncthing_theme_aware_webUI.mp4"
+      >
         <img
           src="assets/published/03_syncthing_theme_aware_webUI.png"
           alt="Theme-aware Syncthing Web UI"
@@ -112,7 +118,7 @@ activity, folder management, Web UI theming, and plugin settings.
     </td>
     <td width="50%" valign="top">
       <a
-        href="assets/published/04_syncthing_icon_change_and_other_settings.mp4"
+        href="https://ilyazar.github.io/syncshell/assets/published/04_syncthing_icon_change_and_other_settings.mp4"
       >
         <img
           src="assets/published/04_syncthing_icon_change_and_other_settings.png"

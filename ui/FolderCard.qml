@@ -156,16 +156,17 @@ BorderSurface {
     visible: root.folder && root.folder.paused
     anchors.right: parent.right
     anchors.bottom: parent.bottom
-    anchors.margins: Style.space(6)
     width: implicitWidth
-    height: implicitHeight
+    height: openFolderButton.height
+    iconText: "󰅙"
     text: "FORGET"
     tooltipText: "Remove only this unlinked Syncthing configuration"
     bordered: true
     foreground: root.urgent
     fontFamily: root.fontFamily
-    fontSize: Style.font.caption
-    horizontalPadding: Style.space(5)
+    fontSize: Style.font.body
+    iconSize: Style.font.body
+    horizontalPadding: Style.space(6)
     verticalPadding: Style.space(2)
     enabled: !root.mutationBusy
     onClicked: root.forgetRequested()

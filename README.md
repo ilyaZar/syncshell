@@ -20,7 +20,7 @@ any quickshell build, not only Omarchy.
 ## Install
 
 ```bash
-omarchy plugin add https://github.com/ilyaZar/omarchy-syncthing.git --enable
+omarchy plugin add https://github.com/ilyaZar/syncshell.git --enable
 ```
 
 Open the widget and expand **More**. If Syncthing is missing, select **Install
@@ -172,6 +172,24 @@ Folder management and Web UI theming use Syncthing's granular configuration and
 system-path APIs and require Syncthing 1.21.0 or later.
 
 ## Roadmap and prior releases
+
+Planned work stays at the top. Shipped entries come from
+[CHANGELOG.md](CHANGELOG.md), newest first.
+
+| Release | State   | Date       | What changed                                            |
+| ------- | ------- | ---------- | ------------------------------------------------------- |
+| Next    | planned | TBD        | improve and expand Syncthing Web UI customization       |
+|         |         |            | prepare broader Quickshell compatibility                |
+| 0.1.6   | shipped | 2026-08-22 | make live and indexed file activity accurate            |
+|         |         |            | refine folder lifecycle controls and pending offers     |
+|         |         |            | add versioned icon and live Web UI theme settings       |
+|         |         |            | refresh the preview and add four focused demo videos    |
+| 0.1.5   | shipped | 2026-08-20 | add an optional theme-colored bar icon                  |
+| 0.1.4   | shipped | 2026-08-16 | support TLS-enabled local Syncthing APIs                |
+| 0.1.3   | shipped | 2026-08-15 | add a demo video and improve the documentation          |
+| 0.1.2   | shipped | 2026-08-15 | manage Syncthing folders from the bar panel             |
+| 0.1.1   | shipped | 2026-08-14 | monitor installs and show live synchronization activity |
+| 0.1.0   | shipped | 2026-08-12 | first release                                           |
 
 ## Remove
 

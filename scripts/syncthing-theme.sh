@@ -10,7 +10,12 @@ usage() {
 
 assets_root=$2
 colors_file=${3:-}
-theme_dir="$assets_root/syncthing-omarchy/assets/css"
+theme_root="$assets_root/syncthing-omarchy"
+theme_dir="$theme_root/assets/css"
+script_dir="$theme_root/assets/js"
+gui_url=${SYNCTHING_GUI_URL:-https://127.0.0.1:8384}
+default_index_url="${gui_url%/}/theme-assets/default/index.html"
+refresh_source="$(dirname -- "$0")/../webui/omarchy_theme_refresh.js"
 
 declare -A colors=()
 if [[ -n $colors_file ]]; then
@@ -36,14 +41,23 @@ for key in "${required[@]}"; do
   }
 done
 
-mkdir -p -- "$theme_dir"
+mkdir -p -- "$theme_dir" "$script_dir"
 wrapper_tmp=$(mktemp --tmpdir="$theme_dir" .theme.css.XXXXXX)
 palette_tmp=$(mktemp --tmpdir="$theme_dir" .omarchy-theme.css.XXXXXX)
-trap 'rm -f -- "$wrapper_tmp" "$palette_tmp"' EXIT
+refresh_tmp=$(mktemp --tmpdir="$script_dir" .omarchy-theme-refresh.js.XXXXXX)
+index_source_tmp=$(mktemp --tmpdir="$theme_root" .default-index.html.XXXXXX)
+index_tmp=$(mktemp --tmpdir="$theme_root" .index.html.XXXXXX)
+version_tmp=$(mktemp --tmpdir="$theme_root" .theme-version.txt.XXXXXX)
+trap 'rm -f -- "$wrapper_tmp" "$palette_tmp" "$refresh_tmp" \
+  "$index_source_tmp" "$index_tmp" "$version_tmp"' EXIT
+
+generation="${EPOCHREALTIME//[.,]/}-$RANDOM"
 
 printf '%s\n' \
+  "/* omarchy-generation: $generation */" \
   '@import "/theme-assets/default/assets/css/theme.css";' \
-  '@import "omarchy_syncthing_theme.css";' >"$wrapper_tmp"
+  "@import \"omarchy_syncthing_theme.css?v=$generation\";" \
+  >"$wrapper_tmp"
 
 sed \
   -e "s/{{background}}/${colors[background]}/g" \
@@ -70,9 +84,33 @@ grep -q '{{' "$palette_tmp" && {
   exit 1
 }
 
-chmod 644 -- "$wrapper_tmp" "$palette_tmp"
-mv -- "$wrapper_tmp" "$theme_dir/theme.css"
+curl \
+  --fail \
+  --silent \
+  --show-error \
+  --insecure \
+  --noproxy "*" \
+  "$default_index_url" >"$index_source_tmp"
+
+[[ $(grep -Fc '</head>' "$index_source_tmp") == 1 ]] || {
+  printf 'Syncthing default Web UI has an unexpected document head\n' >&2
+  exit 1
+}
+
+sed \
+  "s#</head>#  <script defer src=\"assets/js/omarchy_theme_refresh.js\" data-theme-version=\"$generation\"></script>\n</head>#" \
+  "$index_source_tmp" >"$index_tmp"
+cp -- "$refresh_source" "$refresh_tmp"
+printf '%s\n' "$generation" >"$version_tmp"
+
+chmod 644 -- "$wrapper_tmp" "$palette_tmp" "$refresh_tmp" \
+  "$index_tmp" "$version_tmp"
 mv -- "$palette_tmp" "$theme_dir/omarchy_syncthing_theme.css"
+mv -- "$wrapper_tmp" "$theme_dir/theme.css"
+mv -- "$refresh_tmp" "$script_dir/omarchy_theme_refresh.js"
+mv -- "$index_tmp" "$theme_root/index.html"
+mv -- "$version_tmp" "$theme_root/theme-version.txt"
+rm -f -- "$index_source_tmp"
 trap - EXIT
 
 printf '%s\n' "$theme_dir"

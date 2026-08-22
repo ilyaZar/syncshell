@@ -28,13 +28,21 @@ test_settings() {
 }
 
 test_themes() {
-  local theme colors
+  local theme colors version
   local themes_root="$HOME/.local/share/omarchy/themes"
+  local default_gui="$test_root/default-gui"
+  local default_index="$default_gui/theme-assets/default/index.html"
+  mkdir -p -- "$(dirname -- "$default_index")"
+  printf '%s\n' \
+    '<!doctype html>' \
+    '<html><head><title>Syncthing</title></head><body></body></html>' \
+    >"$default_index"
   if [[ -d $themes_root ]]; then
     while IFS= read -r colors; do
       theme=$(basename -- "$(dirname -- "$colors")")
-      bash "$root/scripts/syncthing-theme.sh" generate \
-        "$test_root/themes/$theme" "$colors" >/dev/null
+      SYNCTHING_GUI_URL="file://$default_gui" \
+        bash "$root/scripts/syncthing-theme.sh" generate \
+          "$test_root/themes/$theme" "$colors" >/dev/null
       grep -Fxq '@import "/theme-assets/default/assets/css/theme.css";' \
         "$test_root/themes/$theme/syncthing-omarchy/assets/css/theme.css" \
         || fail "$theme did not inherit the Syncthing default theme"
@@ -58,8 +66,9 @@ test_themes() {
     'color5 = "#c792ea"' \
     'color6 = "#89ddff"' \
     >"$user_theme"
-  bash "$root/scripts/syncthing-theme.sh" generate \
-    "$test_root/themes/user" "$user_theme" >/dev/null
+  SYNCTHING_GUI_URL="file://$default_gui" \
+    bash "$root/scripts/syncthing-theme.sh" generate \
+      "$test_root/themes/user" "$user_theme" >/dev/null
   grep -Fxq '@import "/theme-assets/default/assets/css/theme.css";' \
     "$test_root/themes/user/syncthing-omarchy/assets/css/theme.css" \
     || fail "user theme did not inherit the Syncthing default theme"
@@ -70,6 +79,25 @@ test_themes() {
     grep -Fq "$color" "$user_palette" \
       || fail "user theme omitted palette color $color"
   done
+
+  local user_root="$test_root/themes/user/syncthing-omarchy"
+  version=$(<"$user_root/theme-version.txt")
+  [[ $version =~ ^[A-Za-z0-9._-]+$ ]] \
+    || fail "generated theme version is invalid"
+  grep -Fq "omarchy_syncthing_theme.css?v=$version" \
+    "$user_root/assets/css/theme.css" \
+    || fail "theme wrapper did not pin the generated palette"
+  grep -Fq "data-theme-version=\"$version\"" "$user_root/index.html" \
+    || fail "Web UI did not receive the generated theme version"
+  grep -Fq 'src="assets/js/omarchy_theme_refresh.js"' \
+    "$user_root/index.html" \
+    || fail "Web UI did not load the theme refresh helper"
+  cmp -s -- "$root/webui/omarchy_theme_refresh.js" \
+    "$user_root/assets/js/omarchy_theme_refresh.js" \
+    || fail "generated theme refresh helper differs from its source"
+  [[ -z $(find "$user_root" -maxdepth 1 -type f \
+    -name '.default-index.html.*' -print -quit) ]] \
+    || fail "generated theme retained its default index source"
 }
 
 install_fake_plugin() {

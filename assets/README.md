@@ -1,4 +1,25 @@
-# Syncthing status icons
+# Assets
+
+## Marketplace preview
+
+`../preview.png` is intentionally the only published asset outside this
+directory. The Omarchy plugin marketplace discovers a preview only when it uses
+a supported `preview.*` name in the repository root. `manifest.json` has no
+preview path field.
+
+## Published demos
+
+`published/` contains the release media linked from the root README:
+
+- `published/01-syncthing-file-activity.mp4`
+- `published/02-syncthing-folder-lifecycle.mp4`
+
+The ignored capture harness, upstream reference, and byte-identical release
+backups live in `../tests/interactive/syncthing-demo/`. The ignored project
+skill at `../.agents/skills/syncthing-demo-video/` documents the reproduction
+workflow.
+
+## Syncthing status icons
 
 The four SVG files in this directory are formatting adaptations of Syncthing's
 official 16-by-16 status icons. Their appearance and view boxes are preserved:

@@ -2,6 +2,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 import "core"
+import "models/ServiceStateModel.js" as ServiceStateModel
 
 QtObject {
   id: root
@@ -55,6 +56,26 @@ QtObject {
   readonly property bool settingsBusy: settings.busy
   readonly property string settingsError: settings.error
   readonly property string settingsNotice: settings.notice
+  readonly property bool settingsReady: settings.settingsReady
+  readonly property string configuredServiceState: settings.serviceState
+  readonly property string serviceActiveState: installation.serviceActiveState
+  readonly property string serviceUnitFileState: installation.unitFileState
+  readonly property var serviceStateDecision: ServiceStateModel.decision(
+    configuredServiceState, serviceUnitFileState, serviceActiveState)
+  readonly property bool serviceStateDrift: settingsReady && serviceAvailable
+    && serviceStateDecision.status === "drift"
+  readonly property bool serviceStateActionRunning:
+    settings.serviceStateActionRunning || installation.unitFileActionRunning
+  readonly property string serviceStateMessage: serviceStateDrift
+    ? serviceStateDecision.message : ""
+  readonly property string serviceStatePrimaryLabel: serviceStateDrift
+    ? serviceStateDecision.first.label : ""
+  readonly property string serviceStateSecondaryLabel: serviceStateDrift
+    ? serviceStateDecision.second.label : ""
+  readonly property string serviceStateWarning: settingsReady && serviceAvailable
+    && serviceStateDecision.status === "unsupported"
+    && serviceUnitFileState !== "not-found"
+    ? serviceStateDecision.reason : ""
 
   property string _apiKey: ""
   property bool _useTls: false
@@ -218,6 +239,17 @@ QtObject {
 
   function clearSettingsNotice() {
     settings.clearNotice()
+  }
+
+  function chooseServiceStateAction(index) {
+    if (!serviceStateDrift || serviceStateActionRunning) return false
+    var action = index === 0
+      ? serviceStateDecision.first : serviceStateDecision.second
+    if (action.side === "config") return settings.setServiceState(action.value)
+    if (action.side === "system") {
+      return installation.setUnitFileState(action.value)
+    }
+    return false
   }
 
   function requestSelfRemoval(deletePluginSettings) {

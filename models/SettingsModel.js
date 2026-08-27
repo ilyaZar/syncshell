@@ -2,6 +2,7 @@
 
 var DefaultIconStyle = "branded"
 var DefaultWebUiTheme = "omarchy"
+var DefaultServiceState = "enabled"
 var SupportedVersion = 1
 
 function stripComment(line) {
@@ -35,8 +36,8 @@ function parse(raw) {
   var lines = String(raw || "").split("\n")
   var section = ""
   var version = null
-  var structured = false
   var styleSectionSeen = false
+  var serviceSectionSeen = false
   var rootStyleSetting = false
 
   for (var i = 0; i < lines.length; i++) {
@@ -44,16 +45,18 @@ function parse(raw) {
     if (!line) continue
     var header = line.match(/^\[([A-Za-z_][A-Za-z0-9_-]*)\]$/)
     if (header) {
-      structured = true
       section = header[1]
-      if (section !== "style") {
+      if (section !== "style" && section !== "service") {
         return { error: "Unknown settings section " + section
           + " on line " + (i + 1) }
       }
-      if (styleSectionSeen) {
-        return { error: "Duplicate settings section style on line " + (i + 1) }
+      if ((section === "style" && styleSectionSeen)
+          || (section === "service" && serviceSectionSeen)) {
+        return { error: "Duplicate settings section " + section
+          + " on line " + (i + 1) }
       }
-      styleSectionSeen = true
+      if (section === "style") styleSectionSeen = true
+      else serviceSectionSeen = true
       continue
     }
     var assignment = line.match(/^([A-Za-z_][A-Za-z0-9_-]*)\s*=\s*(.+)$/)
@@ -62,7 +65,6 @@ function parse(raw) {
     }
     var key = assignment[1]
     if (key === "version" && !section) {
-      structured = true
       if (version !== null) {
         return { error: "Duplicate setting version on line " + (i + 1) }
       }
@@ -72,13 +74,14 @@ function parse(raw) {
       }
       continue
     }
-    if (key !== "icon_style" && key !== "web_ui_theme") {
+    var styleSetting = key === "icon_style" || key === "web_ui_theme"
+    var serviceSetting = key === "service_state"
+    if ((section === "service" && !serviceSetting)
+        || (section !== "service" && !styleSetting)) {
       return { error: "Unknown setting " + (section ? section + "." : "")
         + key + " on line " + (i + 1) }
     }
-    if (!section) {
-      rootStyleSetting = true
-    }
+    if (!section && styleSetting) rootStyleSetting = true
     if (values[key] !== undefined) {
       return { error: "Duplicate setting " + key + " on line " + (i + 1) }
     }
@@ -89,7 +92,7 @@ function parse(raw) {
     values[key] = value
   }
 
-  if (structured) {
+  if (version !== null || styleSectionSeen) {
     if (version === null) return { error: "Missing setting version" }
     if (version !== SupportedVersion) {
       return { error: "Unsupported settings version " + version }
@@ -112,17 +115,24 @@ function parse(raw) {
   if (["default", "omarchy"].indexOf(values.web_ui_theme) < 0) {
     return { error: "web_ui_theme must be default or omarchy" }
   }
-
+  if (values.service_state === undefined) {
+    values.service_state = DefaultServiceState
+  }
+  if (["enabled", "disabled"].indexOf(values.service_state) < 0) {
+    return { error: "service_state must be enabled or disabled" }
+  }
   return {
     error: "",
     iconStyle: values.icon_style,
-    webUiTheme: values.web_ui_theme
+    webUiTheme: values.web_ui_theme,
+    serviceState: values.service_state
   }
 }
 
 function defaults(legacyThemedIcon) {
   return {
     iconStyle: legacyThemedIcon === true ? "themed" : DefaultIconStyle,
-    webUiTheme: DefaultWebUiTheme
+    webUiTheme: DefaultWebUiTheme,
+    serviceState: DefaultServiceState
   }
 }

@@ -28,6 +28,7 @@ QtObject {
   property bool settingsExists: false
   property string iconStyle: SettingsModel.DefaultIconStyle
   property string webUiTheme: SettingsModel.DefaultWebUiTheme
+  property string serviceState: SettingsModel.DefaultServiceState
   property string currentWebUiTheme: ""
   property string guiAssetsPath: ""
   property string error: ""
@@ -39,7 +40,12 @@ QtObject {
   property bool _reconcileAgain: false
   property string _themeBeforeGeneration: ""
   property bool _openAfterEnsure: false
+  property string _settingsAction: ""
   property bool _deleteSettingsAfterRemoval: false
+
+  readonly property bool settingsReady: _settingsLoaded && _settingsValid
+  readonly property bool serviceStateActionRunning:
+    settingsProcess.running && _settingsAction === "service-state"
 
   function localPath(url) {
     var value = String(url || "")
@@ -59,6 +65,7 @@ QtObject {
     _settingsValid = true
     iconStyle = parsed.iconStyle
     webUiTheme = parsed.webUiTheme
+    serviceState = parsed.serviceState
     error = ""
     scheduleReconcile()
   }
@@ -70,6 +77,7 @@ QtObject {
     _settingsValid = true
     iconStyle = values.iconStyle
     webUiTheme = values.webUiTheme
+    serviceState = values.serviceState
     error = ""
     scheduleReconcile()
   }
@@ -88,12 +96,28 @@ QtObject {
     }
     if (settingsProcess.running) return
     _openAfterEnsure = true
+    _settingsAction = "ensure"
     busy = true
     settingsProcess.command = [
       "bash", settingsHelperPath, "ensure", settingsTemplatePath,
       settingsPath, iconStyle
     ]
     settingsProcess.running = true
+  }
+
+  function setServiceState(state) {
+    var desired = String(state || "")
+    if (["enabled", "disabled"].indexOf(desired) < 0
+        || !settingsReady || busy || settingsProcess.running) return false
+    _settingsAction = "service-state"
+    busy = true
+    error = ""
+    settingsProcess.command = [
+      "bash", settingsHelperPath, "set-service-state", settingsTemplatePath,
+      settingsPath, iconStyle, desired
+    ]
+    settingsProcess.running = true
+    return true
   }
 
   function clearNotice() {
@@ -258,6 +282,7 @@ QtObject {
     id: settingsProcess
     command: []
     onExited: function(exitCode) {
+      var action = root._settingsAction
       root.busy = false
       if (exitCode === 0) {
         settingsFile.reload()
@@ -266,8 +291,16 @@ QtObject {
             "omarchy", "launch", "config-editor", root.settingsPath
           ])
         }
-      } else root.error = "Could not create Syncthing plugin settings"
+        if (action === "service-state") {
+          root.notice = "Syncthing service preference updated"
+        }
+      } else {
+        root.error = action === "service-state"
+          ? "Could not update Syncthing service preference"
+          : "Could not create Syncthing plugin settings"
+      }
       root._openAfterEnsure = false
+      root._settingsAction = ""
     }
   }
 

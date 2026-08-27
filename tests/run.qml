@@ -2,6 +2,7 @@ import QtQuick
 import "../core"
 import "../models/FolderModel.js" as FolderModel
 import "../models/PanelModel.js" as PanelModel
+import "../models/ServiceStateModel.js" as ServiceStateModel
 import "../models/SettingsModel.js" as SettingsModel
 
 QtObject {
@@ -178,7 +179,8 @@ QtObject {
     compare(parsed, {
       error: "",
       iconStyle: "themed",
-      webUiTheme: "default"
+      webUiTheme: "default",
+      serviceState: "enabled"
     }, "versioned settings")
     compare(SettingsModel.parse([
       "icon_style = \"branded\"",
@@ -186,16 +188,46 @@ QtObject {
     ].join("\n")), {
       error: "",
       iconStyle: "branded",
-      webUiTheme: "omarchy"
+      webUiTheme: "omarchy",
+      serviceState: "enabled"
     }, "legacy flat settings")
     compare(SettingsModel.defaults(true), {
       iconStyle: "themed",
-      webUiTheme: "omarchy"
+      webUiTheme: "omarchy",
+      serviceState: "enabled"
     }, "legacy themed icon migration")
     compare(SettingsModel.defaults(false), {
       iconStyle: "branded",
-      webUiTheme: "omarchy"
+      webUiTheme: "omarchy",
+      serviceState: "enabled"
     }, "implicit defaults")
+    compare(SettingsModel.parse([
+      "version = 1",
+      "",
+      "[style]",
+      "icon_style = \"branded\"",
+      "web_ui_theme = \"omarchy\"",
+      "",
+      "[service]",
+      "service_state = \"disabled\""
+    ].join("\n")), {
+      error: "",
+      iconStyle: "branded",
+      webUiTheme: "omarchy",
+      serviceState: "disabled"
+    }, "service settings")
+    compare(SettingsModel.parse([
+      "icon_style = \"themed\"",
+      "web_ui_theme = \"default\"",
+      "",
+      "[service]",
+      "service_state = \"disabled\""
+    ].join("\n")), {
+      error: "",
+      iconStyle: "themed",
+      webUiTheme: "default",
+      serviceState: "disabled"
+    }, "legacy settings with service section")
     compare(SettingsModel.parse([
       "icon_style = \"branded\"",
       "web_ui_theme = \"unknown\""
@@ -223,6 +255,97 @@ QtObject {
       "web_ui_theme = \"omarchy\""
     ].join("\n")).error,
       "Style settings must be inside [style]", "unscoped style setting")
+    compare(SettingsModel.parse([
+      "icon_style = \"branded\"",
+      "web_ui_theme = \"omarchy\"",
+      "[service]",
+      "service_state = \"automatic\""
+    ].join("\n")).error,
+      "service_state must be enabled or disabled", "invalid service state")
+  }
+
+  function actionSummary(action) {
+    return {
+      side: action.side,
+      value: action.value,
+      preferred: action.preferred,
+      label: action.label
+    }
+  }
+
+  function testServiceStateModel() {
+    var runtimeStates = ["active", "inactive"]
+    var configuredStates = ["enabled", "disabled"]
+    for (var runtimeIndex = 0; runtimeIndex < runtimeStates.length;
+        runtimeIndex++) {
+      for (var configIndex = 0; configIndex < configuredStates.length;
+          configIndex++) {
+        var aligned = ServiceStateModel.decision(
+          configuredStates[configIndex], configuredStates[configIndex],
+          runtimeStates[runtimeIndex])
+        compare(aligned.status, "aligned", "aligned service state")
+      }
+    }
+
+    var cases = [{
+      runtime: "active", config: "enabled", unit: "disabled",
+      message: "Syncthing config (enabled) differs from its systemd "
+        + "autostart setting (disabled).\n\nPlease choose:",
+      first: ["system", "enabled",
+        "Enable systemd autostart (preferred)"],
+      second: ["config", "disabled", "Set Syncthing config to disabled"]
+    }, {
+      runtime: "active", config: "disabled", unit: "enabled",
+      message: "Syncthing config (disabled) differs from its systemd "
+        + "autostart setting (enabled).\n\nPlease choose:",
+      first: ["config", "enabled",
+        "Set Syncthing config to enabled (preferred)"],
+      second: ["system", "disabled", "Disable systemd autostart"]
+    }, {
+      runtime: "inactive", config: "disabled", unit: "enabled",
+      message: "Syncthing config (disabled) differs from its systemd "
+        + "autostart setting (enabled).\n\nPlease choose:",
+      first: ["system", "disabled",
+        "Disable systemd autostart (preferred)"],
+      second: ["config", "enabled", "Set Syncthing config to enabled"]
+    }, {
+      runtime: "inactive", config: "enabled", unit: "disabled",
+      message: "Syncthing config (enabled) differs from its systemd "
+        + "autostart setting (disabled).\n\nPlease choose:",
+      first: ["config", "disabled",
+        "Set Syncthing config to disabled (preferred)"],
+      second: ["system", "enabled", "Enable systemd autostart"]
+    }]
+    for (var i = 0; i < cases.length; i++) {
+      var current = cases[i]
+      var decision = ServiceStateModel.decision(
+        current.config, current.unit, current.runtime)
+      compare(decision.status, "drift", "divergent service state")
+      compare(decision.message, current.message, "service state message")
+      compare(actionSummary(decision.first), {
+        side: current.first[0], value: current.first[1], preferred: true,
+        label: current.first[2]
+      }, "preferred service action")
+      compare(actionSummary(decision.second), {
+        side: current.second[0], value: current.second[1], preferred: false,
+        label: current.second[2]
+      }, "alternate service action")
+    }
+
+    compare(ServiceStateModel.decision(
+      "enabled", "masked", "inactive").status,
+      "unsupported", "masked unit state")
+    compare(ServiceStateModel.decision(
+      "enabled", "disabled", "activating").status,
+      "unsupported", "transitional runtime state")
+    compare(ServiceStateModel.persistenceCommand("enabled"), [
+      "systemctl", "--user", "enable", "syncthing.service"
+    ], "enable persistence command")
+    compare(ServiceStateModel.persistenceCommand("disabled"), [
+      "systemctl", "--user", "disable", "syncthing.service"
+    ], "disable persistence command")
+    compare(ServiceStateModel.persistenceCommand("masked"), [],
+      "unsupported persistence command")
   }
 
   Component.onCompleted: {
@@ -232,6 +355,7 @@ QtObject {
       testModels()
       testPendingFolderOffers()
       testSettings()
+      testServiceStateModel()
       console.log("all tests passed")
       Qt.exit(0)
     } catch (error) {

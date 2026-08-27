@@ -5,3 +5,7 @@ version = 1
 icon_style = "branded"
 # "default" vs. "omarchy": Syncthing styling vs. following the active Omarchy theme
 web_ui_theme = "omarchy"
+
+[service]
+# Persistent Syncthing user-service state, independent of the runtime toggle
+service_state = "enabled"

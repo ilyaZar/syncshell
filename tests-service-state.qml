@@ -22,6 +22,7 @@ ShellRoot {
 
   property InstallationController controller: InstallationController {
     helperPath: Quickshell.env("SYNCSHELL_INSTALL_HELPER")
+    probeIntervalSeconds: 3600
   }
 
   property Timer pollTimer: Timer {

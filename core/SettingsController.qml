@@ -29,6 +29,8 @@ QtObject {
   property string iconStyle: SettingsModel.DefaultIconStyle
   property string webUiTheme: SettingsModel.DefaultWebUiTheme
   property string serviceState: SettingsModel.DefaultServiceState
+  property int probeIntervalSeconds:
+    SettingsModel.DefaultProbeIntervalSeconds
   property string currentWebUiTheme: ""
   property string guiAssetsPath: ""
   property string error: ""
@@ -66,6 +68,7 @@ QtObject {
     iconStyle = parsed.iconStyle
     webUiTheme = parsed.webUiTheme
     serviceState = parsed.serviceState
+    probeIntervalSeconds = parsed.probeIntervalSeconds
     error = ""
     scheduleReconcile()
   }
@@ -78,6 +81,7 @@ QtObject {
     iconStyle = values.iconStyle
     webUiTheme = values.webUiTheme
     serviceState = values.serviceState
+    probeIntervalSeconds = values.probeIntervalSeconds
     error = ""
     scheduleReconcile()
   }

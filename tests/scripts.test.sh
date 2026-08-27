@@ -22,6 +22,8 @@ test_settings() {
     || fail "legacy icon choice was not seeded"
   grep -Eq '^service_state[[:space:]]*=[[:space:]]*"enabled"' "$target" \
     || fail "service state was not seeded"
+  grep -Eq '^probe_interval_seconds[[:space:]]*=[[:space:]]*15$' "$target" \
+    || fail "service probe interval was not seeded"
 
   bash "$root/scripts/syncthing-settings.sh" set-service-state \
     "$root/config/settings.toml" "$target" themed disabled >/dev/null

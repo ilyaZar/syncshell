@@ -3,6 +3,9 @@
 var DefaultIconStyle = "branded"
 var DefaultWebUiTheme = "omarchy"
 var DefaultServiceState = "enabled"
+var DefaultProbeIntervalSeconds = 15
+var MinimumProbeIntervalSeconds = 1
+var MaximumProbeIntervalSeconds = 3600
 var SupportedVersion = 1
 
 function stripComment(line) {
@@ -27,6 +30,11 @@ function parseValue(raw) {
 }
 
 function parseVersion(raw) {
+  var value = String(raw || "").trim()
+  return /^(0|[1-9][0-9]*)$/.test(value) ? Number(value) : null
+}
+
+function parseInteger(raw) {
   var value = String(raw || "").trim()
   return /^(0|[1-9][0-9]*)$/.test(value) ? Number(value) : null
 }
@@ -76,6 +84,7 @@ function parse(raw) {
     }
     var styleSetting = key === "icon_style" || key === "web_ui_theme"
     var serviceSetting = key === "service_state"
+      || key === "probe_interval_seconds"
     if ((section === "service" && !serviceSetting)
         || (section !== "service" && !styleSetting)) {
       return { error: "Unknown setting " + (section ? section + "." : "")
@@ -85,11 +94,21 @@ function parse(raw) {
     if (values[key] !== undefined) {
       return { error: "Duplicate setting " + key + " on line " + (i + 1) }
     }
-    var value = parseValue(assignment[2])
-    if (value === null) {
-      return { error: key + " must use a quoted value" }
+    if (key === "probe_interval_seconds") {
+      var interval = parseInteger(assignment[2])
+      if (interval === null || interval < MinimumProbeIntervalSeconds
+          || interval > MaximumProbeIntervalSeconds) {
+        return { error: "probe_interval_seconds must be an integer between "
+          + MinimumProbeIntervalSeconds + " and " + MaximumProbeIntervalSeconds }
+      }
+      values[key] = interval
+    } else {
+      var value = parseValue(assignment[2])
+      if (value === null) {
+        return { error: key + " must use a quoted value" }
+      }
+      values[key] = value
     }
-    values[key] = value
   }
 
   if (version !== null || styleSectionSeen) {
@@ -121,11 +140,16 @@ function parse(raw) {
   if (["enabled", "disabled"].indexOf(values.service_state) < 0) {
     return { error: "service_state must be enabled or disabled" }
   }
+  if (values.probe_interval_seconds === undefined) {
+    values.probe_interval_seconds = DefaultProbeIntervalSeconds
+  }
+
   return {
     error: "",
     iconStyle: values.icon_style,
     webUiTheme: values.web_ui_theme,
-    serviceState: values.service_state
+    serviceState: values.service_state,
+    probeIntervalSeconds: values.probe_interval_seconds
   }
 }
 
@@ -133,6 +157,7 @@ function defaults(legacyThemedIcon) {
   return {
     iconStyle: legacyThemedIcon === true ? "themed" : DefaultIconStyle,
     webUiTheme: DefaultWebUiTheme,
-    serviceState: DefaultServiceState
+    serviceState: DefaultServiceState,
+    probeIntervalSeconds: DefaultProbeIntervalSeconds
   }
 }

@@ -180,7 +180,8 @@ QtObject {
       error: "",
       iconStyle: "themed",
       webUiTheme: "default",
-      serviceState: "enabled"
+      serviceState: "enabled",
+      probeIntervalSeconds: 15
     }, "versioned settings")
     compare(SettingsModel.parse([
       "icon_style = \"branded\"",
@@ -189,17 +190,20 @@ QtObject {
       error: "",
       iconStyle: "branded",
       webUiTheme: "omarchy",
-      serviceState: "enabled"
+      serviceState: "enabled",
+      probeIntervalSeconds: 15
     }, "legacy flat settings")
     compare(SettingsModel.defaults(true), {
       iconStyle: "themed",
       webUiTheme: "omarchy",
-      serviceState: "enabled"
+      serviceState: "enabled",
+      probeIntervalSeconds: 15
     }, "legacy themed icon migration")
     compare(SettingsModel.defaults(false), {
       iconStyle: "branded",
       webUiTheme: "omarchy",
-      serviceState: "enabled"
+      serviceState: "enabled",
+      probeIntervalSeconds: 15
     }, "implicit defaults")
     compare(SettingsModel.parse([
       "version = 1",
@@ -209,12 +213,14 @@ QtObject {
       "web_ui_theme = \"omarchy\"",
       "",
       "[service]",
-      "service_state = \"disabled\""
+      "service_state = \"disabled\"",
+      "probe_interval_seconds = 27"
     ].join("\n")), {
       error: "",
       iconStyle: "branded",
       webUiTheme: "omarchy",
-      serviceState: "disabled"
+      serviceState: "disabled",
+      probeIntervalSeconds: 27
     }, "service settings")
     compare(SettingsModel.parse([
       "icon_style = \"themed\"",
@@ -226,7 +232,8 @@ QtObject {
       error: "",
       iconStyle: "themed",
       webUiTheme: "default",
-      serviceState: "disabled"
+      serviceState: "disabled",
+      probeIntervalSeconds: 15
     }, "legacy settings with service section")
     compare(SettingsModel.parse([
       "icon_style = \"branded\"",
@@ -262,6 +269,14 @@ QtObject {
       "service_state = \"automatic\""
     ].join("\n")).error,
       "service_state must be enabled or disabled", "invalid service state")
+    compare(SettingsModel.parse([
+      "icon_style = \"branded\"",
+      "web_ui_theme = \"omarchy\"",
+      "[service]",
+      "probe_interval_seconds = 0"
+    ].join("\n")).error,
+      "probe_interval_seconds must be an integer between 1 and 3600",
+      "invalid probe interval")
   }
 
   function actionSummary(action) {

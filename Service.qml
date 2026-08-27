@@ -58,6 +58,7 @@ QtObject {
   readonly property string settingsNotice: settings.notice
   readonly property bool settingsReady: settings.settingsReady
   readonly property string configuredServiceState: settings.serviceState
+  readonly property int probeIntervalSeconds: settings.probeIntervalSeconds
   readonly property string serviceActiveState: installation.serviceActiveState
   readonly property string serviceUnitFileState: installation.unitFileState
   readonly property var serviceStateDecision: ServiceStateModel.decision(
@@ -126,6 +127,7 @@ QtObject {
   property InstallationController installation: InstallationController {
     helperPath: root.helperPath
     folderMutationBusy: root.folderMutationBusy
+    probeIntervalSeconds: root.probeIntervalSeconds
     onRuntimeUnavailable: function(nextPhase) { root.stopApi(nextPhase) }
     onRuntimeAvailable: {
       if (!root._apiKey && !apiKeyProcess.running) root.refreshApi()

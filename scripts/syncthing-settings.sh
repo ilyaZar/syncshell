@@ -85,6 +85,7 @@ write_service_state() {
         if (NR > 0) print ""
         print "[service]"
         write_state()
+        print "probe_interval_seconds = 15"
       } else if (in_service && !state_seen) {
         write_state()
       }

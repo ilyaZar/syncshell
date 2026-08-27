@@ -15,6 +15,7 @@ QtObject {
   property bool serviceRunning: false
   property string serviceActiveState: "inactive"
   property string unitFileState: "not-found"
+  property int probeIntervalSeconds: 15
   property bool operationRunning: false
   property bool refreshing: false
   property bool packageActionRunning: false
@@ -167,7 +168,7 @@ QtObject {
   }
 
   property Timer statusTimer: Timer {
-    interval: 15000
+    interval: Math.max(1, root.probeIntervalSeconds) * 1000
     repeat: true
     running: true
     triggeredOnStart: true

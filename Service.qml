@@ -23,6 +23,14 @@ QtObject {
   property var pendingFolders: ({})
   property var folderStatuses: ({})
   property string localDeviceId: ""
+  readonly property string lastKnownLocalDeviceId:
+    identityState.localDeviceId
+  readonly property string lastKnownLocalDeviceName:
+    identityState.localDeviceName
+  readonly property string displayDeviceId: localDeviceId
+    || lastKnownLocalDeviceId
+  readonly property string displayDeviceName: currentLocalDeviceName()
+    || lastKnownLocalDeviceName
   readonly property var syncingFiles: activityTracker.syncingFiles
 
   readonly property bool folderMutationBusy: folderController.mutationBusy
@@ -92,6 +100,12 @@ QtObject {
   property var _requests: []
   property string _keyOutput: ""
 
+  property PersistentProperties identityState: PersistentProperties {
+    reloadableId: "syncshell-local-device-identity"
+    property string localDeviceId: ""
+    property string localDeviceName: ""
+  }
+
   readonly property bool online: phase === "ready"
   readonly property bool serviceActive: installation.serviceActive
   readonly property bool serviceActionRunning: installation.serviceActionRunning
@@ -104,6 +118,9 @@ QtObject {
   readonly property int folderProblemCount: countFolderProblems()
   readonly property int syncingFolderCount: countSyncingFolders()
   readonly property string summaryText: summary()
+
+  onLocalDeviceIdChanged: rememberLocalIdentity()
+  onDevicesChanged: rememberLocalIdentity()
 
   property ActivityTracker activityTracker: ActivityTracker {
     enabled: root._apiKey !== "" && root.canUseRuntime
@@ -184,6 +201,28 @@ QtObject {
       else if (id && values[id] && values[id].connected === true) count++
     }
     return count
+  }
+
+  function currentLocalDeviceName() {
+    if (!localDeviceId) return ""
+    for (var i = 0; i < devices.length; i++) {
+      var device = devices[i] || ({})
+      if (String(device.deviceID || "") === localDeviceId && device.name) {
+        return String(device.name)
+      }
+    }
+    return ""
+  }
+
+  function rememberLocalIdentity() {
+    var id = String(localDeviceId || "")
+    if (!id) return
+    if (id !== identityState.localDeviceId) {
+      identityState.localDeviceId = id
+      identityState.localDeviceName = ""
+    }
+    var name = currentLocalDeviceName()
+    if (name) identityState.localDeviceName = name
   }
 
   function countFolderProblems() {
@@ -368,6 +407,14 @@ QtObject {
 
   function setFolderLinked(folderId, linked) {
     return folderController.setLinked(folderId, linked)
+  }
+
+  function rescanFolder(folderId) {
+    return folderController.rescan(folderId)
+  }
+
+  function rescanAllFolders() {
+    return folderController.rescanAll()
   }
 
   function forgetFolder(folderId) {

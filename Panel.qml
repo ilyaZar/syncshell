@@ -130,8 +130,8 @@ Panel {
   }
 
   function copyLocalDeviceId() {
-    copyToClipboard(syncthing ? syncthing.localDeviceId : "",
-      "Device ID copied")
+    copyToClipboard(syncthing ? syncthing.displayDeviceId : "",
+      "Host ID copied")
   }
 
   function copyFolderId(folderId) {

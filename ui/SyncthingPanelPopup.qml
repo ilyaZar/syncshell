@@ -114,8 +114,8 @@ KeyboardPanel {
             }
             if (root.controller.forgetConfirmOpen)
                 return;
-            if (key === "r" && root.controller.syncthing) {
-                root.controller.syncthing.refresh();
+            if (key === "r" && rescanAllButton.enabled) {
+                root.controller.syncthing.rescanAllFolders();
             } else if (key === "w")
                 root.controller.openWebUi();
             else if (key === "p")
@@ -262,13 +262,22 @@ KeyboardPanel {
             spacing: Style.space(8)
 
             Button {
-                id: refreshButton
-                text: root.controller.syncthing && root.controller.syncthing.refreshing ? "Refreshing…" : "Refresh"
+                id: rescanAllButton
+                iconText: "󰑐"
+                text: root.controller.syncthing
+                    && root.controller.syncthing.folderMutationAction
+                        === "rescan-all"
+                    ? "Rescanning…" : "Rescan all directories"
                 bordered: true
                 foreground: root.controller.foreground
                 fontFamily: root.controller.fontFamily
-                enabled: root.controller.syncthing && !root.controller.syncthing.refreshing && !root.controller.syncthing.folderMutationBusy
-                onClicked: root.controller.syncthing.refresh()
+                iconSize: Style.font.body
+                enabled: root.controller.syncthing
+                    && root.controller.syncthing.online
+                    && root.controller.syncthing.folderCount > 0
+                    && !root.controller.syncthing.refreshing
+                    && !root.controller.syncthing.folderMutationBusy
+                onClicked: root.controller.syncthing.rescanAllFolders()
             }
 
             Button {
@@ -281,8 +290,8 @@ KeyboardPanel {
             }
 
             Button {
-                width: refreshButton.height
-                height: refreshButton.height
+                width: rescanAllButton.height
+                height: rescanAllButton.height
                 iconText: "\uf013"
                 iconSize: Style.font.body
                 tooltipText: "Settings"
@@ -301,7 +310,9 @@ KeyboardPanel {
         z: root.controller.removalConfirmOpen ? 12 : 0
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.bottom: parent.bottom
-        text: root.controller.settingsMenuOpen ? "MOVE (j/k or Up/Down)  SELECT (Enter)  BACK (q/Esc)" : "[r]efresh  [w]eb UI  [p]ause/continue  [s]ettings"
+        text: root.controller.settingsMenuOpen
+            ? "MOVE (j/k or Up/Down)  SELECT (Enter)  BACK (q/Esc)"
+            : "[r]escan all  [w]eb UI  [p]ause/continue  [s]ettings"
         color: root.controller.dim
         font.family: root.controller.fontFamily
         font.pixelSize: Style.font.caption

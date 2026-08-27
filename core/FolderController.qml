@@ -231,6 +231,39 @@ QtObject {
     }, linked ? "Could not link the folder" : "Could not unlink the folder")
   }
 
+  function rescan(folderId) {
+    var folder = configuredFolder(folderId)
+    if (!folder) {
+      mutationError = "The selected folder is no longer configured"
+      return false
+    }
+    if (folder.paused) {
+      mutationError = "Link the folder before rescanning it"
+      return false
+    }
+    if (!begin("rescan", folder.id)) return false
+    requestMutation("scanFolder", {
+      method: "POST", query: { folder: folder.id }
+    }, function() {
+      root.finish("Rescan requested for " + String(folder.label || folder.id))
+    }, "Could not rescan the folder")
+    return true
+  }
+
+  function rescanAll() {
+    if (folders.length === 0) {
+      mutationError = "No directories are configured"
+      return false
+    }
+    if (!begin("rescan-all", "")) return false
+    requestMutation("scanFolder", {
+      method: "POST"
+    }, function() {
+      root.finish("Rescan complete for all directories")
+    }, "Could not rescan all directories")
+    return true
+  }
+
   function forget(folderId) {
     var folder = configuredFolder(folderId)
     if (!folder) {

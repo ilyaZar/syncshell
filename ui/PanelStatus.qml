@@ -35,7 +35,7 @@ Column {
       width: parent.width
       title: "Syncthing"
       meta: root.controller.localDeviceName
-        + (root.syncthing && root.syncthing.localDeviceId ? "  󰆏" : "")
+      metaOpacity: 0
       foreground: root.foreground
       fontFamily: root.fontFamily
       iconOpacity: root.syncthing && root.syncthing.serviceActive
@@ -57,6 +57,8 @@ Column {
           visible: header.serviceAvailable
           checked: header.serviceActive
           busy: header.serviceBusy
+          trackHeight: Style.space(16)
+          cursorPad: Style.space(4)
           foreground: hero.foreground
           onToggled: root.controller.toggleSyncing()
 
@@ -69,23 +71,50 @@ Column {
       }
     }
 
-    MouseArea {
-      id: copyDeviceId
+    Item {
+      id: deviceMetaRow
       anchors.left: hero.left
       anchors.leftMargin: hero.iconSize + Style.space(14)
       anchors.right: hero.right
       anchors.rightMargin: hero.trailingInset
       anchors.bottom: hero.bottom
-      height: Style.space(18)
-      enabled: root.syncthing && root.syncthing.localDeviceId !== ""
-      hoverEnabled: enabled
-      cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
-      onClicked: root.controller.copyLocalDeviceId()
+      height: Math.max(deviceNameText.implicitHeight,
+        copyHostIdButton.height)
 
-      PanelToolTip {
-        visible: copyDeviceId.containsMouse
-        text: "Copy Syncthing device ID"
+      Text {
+        id: deviceNameText
+        anchors.left: parent.left
+        anchors.verticalCenter: parent.verticalCenter
+        width: Math.min(implicitWidth, Math.max(0,
+          deviceMetaRow.width - (copyHostIdButton.visible
+            ? copyHostIdButton.width + Style.space(4) : 0)))
+        text: root.controller.localDeviceName.toUpperCase()
+        color: Qt.darker(root.foreground, 1.4)
+        font.family: root.fontFamily
+        font.pixelSize: Style.font.caption
+        font.bold: true
+        font.letterSpacing: 1.2
+        elide: Text.ElideRight
+      }
+
+      Button {
+        id: copyHostIdButton
+        anchors.left: deviceNameText.right
+        anchors.leftMargin: Style.space(4)
+        anchors.verticalCenter: parent.verticalCenter
+        visible: root.syncthing && root.syncthing.displayDeviceId !== ""
+        height: Math.round(deviceNameText.implicitHeight)
+        text: "host ID"
+        iconText: "󰆏"
+        tooltipText: "Copy host ID"
+        bordered: true
+        foreground: root.foreground
         fontFamily: root.fontFamily
+        fontSize: Math.max(Style.space(8), Style.font.caption - 1)
+        iconSize: Math.max(Style.space(7), Style.font.caption - 3)
+        horizontalPadding: Style.space(4)
+        verticalPadding: 0
+        onClicked: root.controller.copyLocalDeviceId()
       }
     }
   }

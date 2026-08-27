@@ -7,6 +7,7 @@ BorderSurface {
 
   property var folder: ({})
   property bool selected: false
+  property bool online: false
   property bool mutationBusy: false
   property string stateLabel: "UNKNOWN"
   property color stateColor: foreground
@@ -30,6 +31,7 @@ BorderSurface {
 
   signal openRequested
   signal forgetRequested
+  signal rescanRequested
   signal copyIdRequested(string folderId)
 
   implicitHeight: nameActions.implicitHeight + details.implicitHeight
@@ -112,8 +114,7 @@ BorderSurface {
     anchors.right: parent.right
     anchors.top: nameActions.bottom
     anchors.leftMargin: Style.space(8)
-    anchors.rightMargin: root.folder.paused
-      ? forgetButton.width + Style.space(14) : Style.space(8)
+    anchors.rightMargin: folderActionButton.width + Style.space(14)
     anchors.topMargin: Style.space(6)
     spacing: Style.space(1)
 
@@ -151,24 +152,29 @@ BorderSurface {
   }
 
   Button {
-    id: forgetButton
+    id: folderActionButton
     z: 1
-    visible: root.folder && root.folder.paused
+    visible: root.folder
     anchors.right: parent.right
     anchors.bottom: parent.bottom
     width: implicitWidth
     height: openFolderButton.height
-    iconText: "󰅙"
-    text: "FORGET"
-    tooltipText: "Remove only this unlinked Syncthing configuration"
+    iconText: root.folder.paused ? "󰅙" : "󰑐"
+    text: root.folder.paused ? "FORGET" : "RESCAN"
+    tooltipText: root.folder.paused
+      ? "Remove only this unlinked Syncthing configuration"
+      : "Rescan this folder for local changes"
     bordered: true
-    foreground: root.urgent
+    foreground: root.folder.paused ? root.urgent : root.foreground
     fontFamily: root.fontFamily
     fontSize: Style.font.body
     iconSize: Style.font.body
     horizontalPadding: Style.space(6)
     verticalPadding: Style.space(2)
-    enabled: !root.mutationBusy
-    onClicked: root.forgetRequested()
+    enabled: root.online && !root.mutationBusy
+    onClicked: {
+      if (root.folder.paused) root.forgetRequested()
+      else root.rescanRequested()
+    }
   }
 }

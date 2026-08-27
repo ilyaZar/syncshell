@@ -128,6 +128,11 @@ QtObject {
       localDeviceId: "local",
       devices: [{ deviceID: "local", name: "optiplex" }]
     }, "fallback"), "optiplex", "configured local device name")
+    compare(PanelModel.localDeviceName({
+      displayDeviceName: "optiplex-sff",
+      localDeviceId: "",
+      devices: []
+    }, "fallback"), "optiplex-sff", "remembered local device name")
     compare(PanelModel.localDeviceName(null, "optiplex-sff"),
       "optiplex-sff", "host name fallback")
   }

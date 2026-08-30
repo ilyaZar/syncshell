@@ -13,7 +13,7 @@ any Linux quickshell build.
 - select the switch/toggle in the top right to start or stop the user service
 - select a folder card to open its directory
 - select **+** to configure an existing local directory
-- select **Refresh** to request an immediate health update
+- select **RESCAN** on a folder or **Rescan all directories** for every folder
 - select **Open Web UI** for device setup and advanced folder options
 - select the gear or press `s` for appearance settings and clean removal
 
@@ -34,7 +34,7 @@ As shown in the footer at the bottom of the main plugin menu
 
 | Key   | Action                    |
 | ----- | ------------------------- |
-| `r`   | refresh status            |
+| `r`   | rescan all folders        |
 | `w`   | open the Web UI           |
 | `p`   | start or stop the service |
 | `s`   | open plugin settings      |
@@ -184,8 +184,10 @@ Planned work stays at the top. Shipped entries come from
 
 | Release | State   | Date       | What changed                                            |
 | ------- | ------- | ---------- | ------------------------------------------------------- |
-| Next    | planned | TBD        | improve and expand Syncthing Web UI customization       |
+| 0.1.8   | planned | TBD        | improve and expand Syncthing Web UI customization       |
 |         |         |            | prepare broader Quickshell compatibility                |
+| 0.1.7   | shipped | 2026-08-31 | fix persistent service-state reconciliation             |
+|         |         |            | UI/UX: clear semantics on buttons, harmonize font size  |
 | 0.1.6   | shipped | 2026-08-22 | make live and indexed file activity accurate            |
 |         |         |            | refine folder lifecycle controls and pending offers     |
 |         |         |            | add versioned icon and live Web UI theme settings       |

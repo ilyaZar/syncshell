@@ -37,6 +37,7 @@ operation_running() {
 detect_status() {
   local active_state="inactive" executable="" executable_path=""
   local label="Not installed" load_state="not-found" state="missing"
+  local unit_file_state="not-found"
 
   executable="$(command -v syncthing 2>/dev/null || true)"
   if [[ -n $executable ]]; then
@@ -46,8 +47,10 @@ detect_status() {
 
   load_state="$(service_property LoadState)"
   active_state="$(service_property ActiveState)"
+  unit_file_state="$(service_property UnitFileState)"
   [[ -n $load_state ]] || load_state="not-found"
   [[ -n $active_state ]] || active_state="inactive"
+  [[ -n $unit_file_state ]] || unit_file_state="not-found"
 
   if [[ -n $executable_path ]]; then
     state="existing"
@@ -63,6 +66,8 @@ detect_status() {
     --arg state "$state" \
     --arg label "$label" \
     --arg executable "$executable_path" \
+    --arg serviceActiveState "$active_state" \
+    --arg unitFileState "$unit_file_state" \
     --argjson serviceAvailable \
       "$([[ $load_state != not-found ]] && echo true || echo false)" \
     --argjson serviceRunning \
@@ -75,6 +80,8 @@ detect_status() {
       executable: $executable,
       serviceAvailable: $serviceAvailable,
       serviceRunning: $serviceRunning,
+      serviceActiveState: $serviceActiveState,
+      unitFileState: $unitFileState,
       operationRunning: $operationRunning
     }'
 }

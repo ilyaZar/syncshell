@@ -2,10 +2,10 @@
   "schemaVersion": 1,
   "id": "io.github.ilyazar.syncthing",
   "name": "Syncthing",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "author": "ilyaZar",
   "license": "MIT AND MPL-2.0",
-  "description": "See sync health, safely manage folders, control the service, and install Syncthing from the Omarchy bar.",
+  "description": "See sync health, safely manage folders, control the service, and install Syncthing from the Omarchy bar. Includes a Web UI theme that follows the Omarchy system theme.",
   "kinds": ["service", "bar-widget"],
   "keepLoaded": true,
   "entryPoints": {
@@ -14,7 +14,7 @@
   },
   "barWidget": {
     "displayName": "Syncthing",
-    "description": "See sync health, safely manage folders, control the service, and install Syncthing.",
+    "description": "See sync health, safely manage folders, control the service, and install Syncthing from the Omarchy bar. Includes a Web UI theme that follows the Omarchy system theme.",
     "category": "Files",
     "allowMultiple": false,
     "defaultSection": "right",

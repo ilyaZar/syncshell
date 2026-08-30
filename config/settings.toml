@@ -1,7 +1,13 @@
 version = 1
 
 [style]
-# "branded" vs. "themed": classic Syncthing icons vs.Omarchy-colored icons
+# "branded" vs. "themed": classic Syncthing icons vs. Omarchy-colored icons
 icon_style = "branded"
 # "default" vs. "omarchy": Syncthing styling vs. following the active Omarchy theme
 web_ui_theme = "omarchy"
+
+[service]
+# Persistent Syncthing user-service state, independent of the runtime toggle
+service_state = "enabled"
+# Seconds between probes for external systemd state changes
+probe_interval_seconds = 15

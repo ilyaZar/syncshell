@@ -102,6 +102,7 @@ BorderSurface {
       text: encryptedCount + " encrypted folder offer"
         + (encryptedCount === 1 ? " requires" : "s require")
         + " the Syncthing Web UI."
+      textFormat: Text.PlainText
       color: root.warning
       font.family: root.fontFamily
       font.pixelSize: Style.font.caption
@@ -110,6 +111,7 @@ BorderSurface {
 
     Text {
       text: "Existing directory"
+      textFormat: Text.PlainText
       color: root.dim
       font.family: root.fontFamily
       font.pixelSize: Style.font.caption
@@ -143,6 +145,7 @@ BorderSurface {
 
     Text {
       text: "Label"
+      textFormat: Text.PlainText
       color: root.dim
       font.family: root.fontFamily
       font.pixelSize: Style.font.caption
@@ -160,6 +163,7 @@ BorderSurface {
 
     Text {
       text: "Folder ID"
+      textFormat: Text.PlainText
       color: root.dim
       font.family: root.fontFamily
       font.pixelSize: Style.font.caption
@@ -204,6 +208,7 @@ BorderSurface {
       width: parent.width
       text: "Reuse the exact ID to rejoin an existing remote folder. "
         + "A new ID creates a different folder identity."
+      textFormat: Text.PlainText
       color: root.dim
       font.family: root.fontFamily
       font.pixelSize: Style.font.caption
@@ -279,6 +284,7 @@ BorderSurface {
       text: devicePicker.values.length === 0
         ? "Local only: this folder will not synchronize with another device."
         : "Selected devices receive a share offer and may need to accept it."
+      textFormat: Text.PlainText
       color: devicePicker.values.length === 0 ? root.warning : root.dim
       font.family: root.fontFamily
       font.pixelSize: Style.font.caption
@@ -290,6 +296,7 @@ BorderSurface {
         && root.syncthing.folderPreparationError !== ""
       width: parent.width
       text: root.syncthing ? root.syncthing.folderPreparationError : ""
+      textFormat: Text.PlainText
       color: root.urgent
       font.family: root.fontFamily
       font.pixelSize: Style.font.caption

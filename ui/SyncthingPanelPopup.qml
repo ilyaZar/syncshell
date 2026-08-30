@@ -43,7 +43,9 @@ KeyboardPanel {
         anchors.fill: parent
         blocked: root.controller.addOpen || moreDetails.folderPopupOpen || moreDetails.pendingPopupOpen
         onCloseRequested: {
-            if (root.controller.removalConfirmOpen) {
+            if (root.controller.serviceStateDialogOpen) {
+                root.controller.close();
+            } else if (root.controller.removalConfirmOpen) {
                 root.controller.removalConfirmOpen = false;
             } else if (root.controller.settingsMenuOpen) {
                 root.controller.closeSettingsMenu();
@@ -56,7 +58,9 @@ KeyboardPanel {
                 root.controller.close();
         }
         onTabRequested: function (direction) {
-            if (root.controller.removalConfirmOpen) {
+            if (root.controller.serviceStateDialogOpen) {
+                serviceStateDialog.selectedChoice = serviceStateDialog.selectedChoice === 0 ? 1 : 0;
+            } else if (root.controller.removalConfirmOpen) {
                 removalDialog.selectedChoice = (removalDialog.selectedChoice + (direction > 0 ? 1 : 2)) % 3;
             } else if (root.controller.settingsMenuOpen) {
                 root.controller.moveSettingsSelection(direction);
@@ -64,7 +68,9 @@ KeyboardPanel {
                 root.controller.switchPanel(direction);
         }
         onMoveRequested: function (dx, dy) {
-            if (root.controller.removalConfirmOpen && dy !== 0) {
+            if (root.controller.serviceStateDialogOpen && (dx !== 0 || dy !== 0)) {
+                serviceStateDialog.selectedChoice = serviceStateDialog.selectedChoice === 0 ? 1 : 0;
+            } else if (root.controller.removalConfirmOpen && dy !== 0) {
                 removalDialog.selectedChoice = (removalDialog.selectedChoice + (dy > 0 ? 1 : 2)) % 3;
             } else if (root.controller.settingsMenuOpen && dy !== 0) {
                 root.controller.moveSettingsSelection(dy);
@@ -75,7 +81,9 @@ KeyboardPanel {
             }
         }
         onActivateRequested: {
-            if (root.controller.removalConfirmOpen) {
+            if (root.controller.serviceStateDialogOpen) {
+                serviceStateDialog.choose();
+            } else if (root.controller.removalConfirmOpen) {
                 removalDialog.choose();
             } else if (root.controller.settingsMenuOpen) {
                 root.controller.activateSettingsSelection();
@@ -89,6 +97,11 @@ KeyboardPanel {
         }
         onTextKey: function (text) {
             var key = text.toLowerCase();
+            if (root.controller.serviceStateDialogOpen) {
+                if (key === "q")
+                    root.controller.close();
+                return;
+            }
             if (root.controller.removalConfirmOpen) {
                 if (key === "q")
                     root.controller.removalConfirmOpen = false;
@@ -101,8 +114,8 @@ KeyboardPanel {
             }
             if (root.controller.forgetConfirmOpen)
                 return;
-            if (key === "r" && root.controller.syncthing) {
-                root.controller.syncthing.refresh();
+            if (key === "r" && rescanAllButton.enabled) {
+                root.controller.syncthing.rescanAllFolders();
             } else if (key === "w")
                 root.controller.openWebUi();
             else if (key === "p")
@@ -249,13 +262,22 @@ KeyboardPanel {
             spacing: Style.space(8)
 
             Button {
-                id: refreshButton
-                text: root.controller.syncthing && root.controller.syncthing.refreshing ? "Refreshing…" : "Refresh"
+                id: rescanAllButton
+                iconText: "󰑐"
+                text: root.controller.syncthing
+                    && root.controller.syncthing.folderMutationAction
+                        === "rescan-all"
+                    ? "Rescanning…" : "Rescan all directories"
                 bordered: true
                 foreground: root.controller.foreground
                 fontFamily: root.controller.fontFamily
-                enabled: root.controller.syncthing && !root.controller.syncthing.refreshing && !root.controller.syncthing.folderMutationBusy
-                onClicked: root.controller.syncthing.refresh()
+                iconSize: Style.font.body
+                enabled: root.controller.syncthing
+                    && root.controller.syncthing.online
+                    && root.controller.syncthing.folderCount > 0
+                    && !root.controller.syncthing.refreshing
+                    && !root.controller.syncthing.folderMutationBusy
+                onClicked: root.controller.syncthing.rescanAllFolders()
             }
 
             Button {
@@ -268,8 +290,8 @@ KeyboardPanel {
             }
 
             Button {
-                width: refreshButton.height
-                height: refreshButton.height
+                width: rescanAllButton.height
+                height: rescanAllButton.height
                 iconText: "\uf013"
                 iconSize: Style.font.body
                 tooltipText: "Settings"
@@ -288,12 +310,35 @@ KeyboardPanel {
         z: root.controller.removalConfirmOpen ? 12 : 0
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.bottom: parent.bottom
-        text: root.controller.settingsMenuOpen ? "MOVE (j/k or Up/Down)  SELECT (Enter)  BACK (q/Esc)" : "[r]efresh  [w]eb UI  [p]ause/continue  [s]ettings"
+        text: root.controller.settingsMenuOpen
+            ? "MOVE (j/k or Up/Down)  SELECT (Enter)  BACK (q/Esc)"
+            : "[r]escan all  [w]eb UI  [p]ause/continue  [s]ettings"
+        textFormat: Text.PlainText
         color: root.controller.dim
         font.family: root.controller.fontFamily
         font.pixelSize: Style.font.caption
         font.bold: true
         font.letterSpacing: 0.8
+    }
+
+    ServiceStateDialog {
+        id: serviceStateDialog
+        parent: keyCatcher
+        anchors.fill: parent
+        opened: root.controller.serviceStateDialogOpen
+        busy: root.controller.syncthing
+            ? root.controller.syncthing.serviceStateActionRunning : false
+        message: root.controller.syncthing
+            ? root.controller.syncthing.serviceStateMessage : ""
+        primaryText: root.controller.syncthing
+            ? root.controller.syncthing.serviceStatePrimaryLabel : ""
+        secondaryText: root.controller.syncthing
+            ? root.controller.syncthing.serviceStateSecondaryLabel : ""
+        fontFamily: root.controller.fontFamily
+        z: 12
+        onActionRequested: function (index) {
+            root.controller.chooseServiceStateAction(index);
+        }
     }
 
     CompactConfirmDialog {

@@ -20,11 +20,89 @@ test_settings() {
     || fail "style section was not seeded"
   grep -Eq '^icon_style[[:space:]]*=[[:space:]]*"themed"' "$target" \
     || fail "legacy icon choice was not seeded"
+  grep -Eq '^service_state[[:space:]]*=[[:space:]]*"enabled"' "$target" \
+    || fail "service state was not seeded"
+  grep -Eq '^probe_interval_seconds[[:space:]]*=[[:space:]]*15$' "$target" \
+    || fail "service probe interval was not seeded"
+
+  bash "$root/scripts/syncthing-settings.sh" set-service-state \
+    "$root/config/settings.toml" "$target" themed disabled >/dev/null
+  grep -Eq '^service_state[[:space:]]*=[[:space:]]*"disabled"' "$target" \
+    || fail "service state was not updated"
+  [[ $(grep -c '^service_state[[:space:]]*=' "$target") == 1 ]] \
+    || fail "service state update created a duplicate"
+  grep -Eq '^icon_style[[:space:]]*=[[:space:]]*"themed"' "$target" \
+    || fail "service state update changed icon style"
+
+  local legacy="$test_root/settings/config/legacy.toml"
+  printf '%s\n' \
+    'icon_style = "branded"' \
+    'web_ui_theme = "default"' \
+    >"$legacy"
+  bash "$root/scripts/syncthing-settings.sh" set-service-state \
+    "$root/config/settings.toml" "$legacy" branded disabled >/dev/null
+  grep -Fxq '[service]' "$legacy" \
+    || fail "legacy settings did not receive a service section"
+  grep -Eq '^service_state[[:space:]]*=[[:space:]]*"disabled"' "$legacy" \
+    || fail "legacy settings did not receive the service state"
+  grep -Fxq 'web_ui_theme = "default"' "$legacy" \
+    || fail "legacy settings were not preserved"
+
+  local invalid="$test_root/settings/config/invalid.toml"
+  local invalid_before
+  printf '%s\n' \
+    'icon_style = "branded"' \
+    'web_ui_theme = "default"' \
+    '[service]' \
+    'service_state = "enabled"' \
+    'service_state = "disabled"' \
+    >"$invalid"
+  invalid_before=$(<"$invalid")
+  if bash "$root/scripts/syncthing-settings.sh" set-service-state \
+      "$root/config/settings.toml" "$invalid" branded enabled \
+      >/dev/null 2>&1; then
+    fail "invalid service settings update succeeded"
+  fi
+  [[ $(<"$invalid") == "$invalid_before" ]] \
+    || fail "failed service settings update changed the file"
+
   printf '%s\n' '# user-owned' >"$target"
   bash "$root/scripts/syncthing-settings.sh" ensure \
     "$root/config/settings.toml" "$target" branded >/dev/null
   [[ $(<"$target") == "# user-owned" ]] \
     || fail "existing settings were overwritten"
+}
+
+test_installation_status() {
+  local sandbox="$test_root/installation-status"
+  local fake_bin="$sandbox/bin"
+  local output
+  mkdir -p -- "$fake_bin" "$sandbox/home" "$sandbox/runtime"
+  printf '%s\n' '#!/bin/bash' 'exit 0' >"$fake_bin/syncthing"
+  printf '%s\n' \
+    '#!/bin/bash' \
+    'set -euo pipefail' \
+    'case " $* " in' \
+    '  *" --property=LoadState "*) printf '\''loaded\n'\'' ;;' \
+    '  *" --property=ActiveState "*) printf '\''inactive\n'\'' ;;' \
+    '  *" --property=UnitFileState "*) printf '\''disabled\n'\'' ;;' \
+    '  *) exit 1 ;;' \
+    'esac' \
+    >"$fake_bin/systemctl"
+  chmod 700 -- "$fake_bin/syncthing" "$fake_bin/systemctl"
+
+  output=$(HOME="$sandbox/home" \
+    XDG_RUNTIME_DIR="$sandbox/runtime" \
+    PATH="$fake_bin:$PATH" \
+    bash "$root/scripts/syncthing-install.sh" status)
+  jq -e '
+    .state == "existing"
+    and .serviceAvailable == true
+    and .serviceRunning == false
+    and .serviceActiveState == "inactive"
+    and .unitFileState == "disabled"
+  ' <<<"$output" >/dev/null \
+    || fail "installation status omitted systemd service state"
 }
 
 test_themes() {
@@ -178,6 +256,7 @@ test_removal_mode() {
 }
 
 test_settings
+test_installation_status
 test_themes
 test_removal_mode preserve link
 test_removal_mode purge link

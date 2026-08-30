@@ -4,6 +4,14 @@ Notable changes to Syncthing for Omarchy are documented here.
 
 ## Unreleased
 
+## 0.1.7 - 2026-08-31
+
+- reconcile configured and systemd user-service startup states without changing
+  the independent runtime start and stop controls (thanks @renews for reporting)
+- add a configurable interval for detecting external systemd state changes
+- add per-folder and all-folder rescans, a clearer host ID copy control, and
+  remembered local host identity while Syncthing is stopped
+
 ## 0.1.6 - 2026-08-22
 
 - Make live and indexed file activity accurate for additions, deletions,

@@ -101,7 +101,9 @@ Panel {
   readonly property string visibleNotice: syncthing
     ? syncthing.folderMutationNotice || syncthing.settingsNotice : ""
   readonly property string visibleWarning: syncthing
-    ? syncthing.recoveryWarning : ""
+    ? syncthing.recoveryWarning || syncthing.serviceStateWarning : ""
+  readonly property bool serviceStateDialogOpen: syncthing
+    && syncthing.serviceStateDrift
   readonly property string visibleSyncActivity: syncthing
     ? syncthing.syncActivity : ""
   readonly property string visibleSyncDots: syncthing
@@ -128,12 +130,16 @@ Panel {
   }
 
   function copyLocalDeviceId() {
-    copyToClipboard(syncthing ? syncthing.localDeviceId : "",
-      "Device ID copied")
+    copyToClipboard(syncthing ? syncthing.displayDeviceId : "",
+      "Host ID copied")
   }
 
   function copyFolderId(folderId) {
     copyToClipboard(folderId, "Folder ID copied")
+  }
+
+  function chooseServiceStateAction(index) {
+    if (syncthing) syncthing.chooseServiceStateAction(index)
   }
 
   function configureService() {
@@ -533,6 +539,7 @@ Panel {
         root.addSubmissionPending = false
       }
     }
+
   }
 
   Process {

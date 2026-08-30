@@ -2,6 +2,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 import "core"
+import "models/ServiceStateModel.js" as ServiceStateModel
 
 QtObject {
   id: root
@@ -22,6 +23,14 @@ QtObject {
   property var pendingFolders: ({})
   property var folderStatuses: ({})
   property string localDeviceId: ""
+  readonly property string lastKnownLocalDeviceId:
+    identityState.localDeviceId
+  readonly property string lastKnownLocalDeviceName:
+    identityState.localDeviceName
+  readonly property string displayDeviceId: localDeviceId
+    || lastKnownLocalDeviceId
+  readonly property string displayDeviceName: currentLocalDeviceName()
+    || lastKnownLocalDeviceName
   readonly property var syncingFiles: activityTracker.syncingFiles
 
   readonly property bool folderMutationBusy: folderController.mutationBusy
@@ -55,6 +64,27 @@ QtObject {
   readonly property bool settingsBusy: settings.busy
   readonly property string settingsError: settings.error
   readonly property string settingsNotice: settings.notice
+  readonly property bool settingsReady: settings.settingsReady
+  readonly property string configuredServiceState: settings.serviceState
+  readonly property int probeIntervalSeconds: settings.probeIntervalSeconds
+  readonly property string serviceActiveState: installation.serviceActiveState
+  readonly property string serviceUnitFileState: installation.unitFileState
+  readonly property var serviceStateDecision: ServiceStateModel.decision(
+    configuredServiceState, serviceUnitFileState, serviceActiveState)
+  readonly property bool serviceStateDrift: settingsReady && serviceAvailable
+    && serviceStateDecision.status === "drift"
+  readonly property bool serviceStateActionRunning:
+    settings.serviceStateActionRunning || installation.unitFileActionRunning
+  readonly property string serviceStateMessage: serviceStateDrift
+    ? serviceStateDecision.message : ""
+  readonly property string serviceStatePrimaryLabel: serviceStateDrift
+    ? serviceStateDecision.first.label : ""
+  readonly property string serviceStateSecondaryLabel: serviceStateDrift
+    ? serviceStateDecision.second.label : ""
+  readonly property string serviceStateWarning: settingsReady && serviceAvailable
+    && serviceStateDecision.status === "unsupported"
+    && serviceUnitFileState !== "not-found"
+    ? serviceStateDecision.reason : ""
 
   property string _apiKey: ""
   property bool _useTls: false
@@ -70,6 +100,12 @@ QtObject {
   property var _requests: []
   property string _keyOutput: ""
 
+  property PersistentProperties identityState: PersistentProperties {
+    reloadableId: "syncshell-local-device-identity"
+    property string localDeviceId: ""
+    property string localDeviceName: ""
+  }
+
   readonly property bool online: phase === "ready"
   readonly property bool serviceActive: installation.serviceActive
   readonly property bool serviceActionRunning: installation.serviceActionRunning
@@ -82,6 +118,9 @@ QtObject {
   readonly property int folderProblemCount: countFolderProblems()
   readonly property int syncingFolderCount: countSyncingFolders()
   readonly property string summaryText: summary()
+
+  onLocalDeviceIdChanged: rememberLocalIdentity()
+  onDevicesChanged: rememberLocalIdentity()
 
   property ActivityTracker activityTracker: ActivityTracker {
     enabled: root._apiKey !== "" && root.canUseRuntime
@@ -105,6 +144,7 @@ QtObject {
   property InstallationController installation: InstallationController {
     helperPath: root.helperPath
     folderMutationBusy: root.folderMutationBusy
+    probeIntervalSeconds: root.probeIntervalSeconds
     onRuntimeUnavailable: function(nextPhase) { root.stopApi(nextPhase) }
     onRuntimeAvailable: {
       if (!root._apiKey && !apiKeyProcess.running) root.refreshApi()
@@ -163,6 +203,28 @@ QtObject {
     return count
   }
 
+  function currentLocalDeviceName() {
+    if (!localDeviceId) return ""
+    for (var i = 0; i < devices.length; i++) {
+      var device = devices[i] || ({})
+      if (String(device.deviceID || "") === localDeviceId && device.name) {
+        return String(device.name)
+      }
+    }
+    return ""
+  }
+
+  function rememberLocalIdentity() {
+    var id = String(localDeviceId || "")
+    if (!id) return
+    if (id !== identityState.localDeviceId) {
+      identityState.localDeviceId = id
+      identityState.localDeviceName = ""
+    }
+    var name = currentLocalDeviceName()
+    if (name) identityState.localDeviceName = name
+  }
+
   function countFolderProblems() {
     var count = 0
     var ids = Object.keys(folderStatuses)
@@ -218,6 +280,17 @@ QtObject {
 
   function clearSettingsNotice() {
     settings.clearNotice()
+  }
+
+  function chooseServiceStateAction(index) {
+    if (!serviceStateDrift || serviceStateActionRunning) return false
+    var action = index === 0
+      ? serviceStateDecision.first : serviceStateDecision.second
+    if (action.side === "config") return settings.setServiceState(action.value)
+    if (action.side === "system") {
+      return installation.setUnitFileState(action.value)
+    }
+    return false
   }
 
   function requestSelfRemoval(deletePluginSettings) {
@@ -334,6 +407,14 @@ QtObject {
 
   function setFolderLinked(folderId, linked) {
     return folderController.setLinked(folderId, linked)
+  }
+
+  function rescanFolder(folderId) {
+    return folderController.rescan(folderId)
+  }
+
+  function rescanAllFolders() {
+    return folderController.rescanAll()
   }
 
   function forgetFolder(folderId) {

@@ -22,6 +22,7 @@ Column {
     width: parent.width
     text: root.syncthing && root.syncthing.online
       ? "No folders configured." : "Folder status is unavailable."
+    textFormat: Text.PlainText
     color: root.dim
     font.family: root.fontFamily
     font.pixelSize: Style.font.body
@@ -41,6 +42,7 @@ Column {
         folder: modelData
         selected: String(modelData.id || "")
           === root.controller.displayedFolderId
+        online: root.syncthing ? root.syncthing.online : false
         mutationBusy: root.syncthing
           ? root.syncthing.folderMutationBusy : false
         stateLabel: root.controller.folderState(modelData)
@@ -58,6 +60,7 @@ Column {
         fontFamily: root.fontFamily
         onOpenRequested: root.controller.openFolder(modelData)
         onForgetRequested: root.controller.requestForget(modelData)
+        onRescanRequested: root.syncthing.rescanFolder(modelData.id)
         onCopyIdRequested: function(folderId) {
           root.controller.copyFolderId(folderId)
         }

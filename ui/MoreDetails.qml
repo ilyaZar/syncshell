@@ -205,6 +205,7 @@ Column {
       }
       return "Checking installation."
     }
+    textFormat: Text.PlainText
     color: root.dim
     font.family: root.fontFamily
     font.pixelSize: Style.font.bodySmall
@@ -216,6 +217,7 @@ Column {
     visible: root.syncthing && root.syncthing.packageStatus !== ""
     width: parent.width
     text: root.syncthing ? root.syncthing.packageStatus : ""
+    textFormat: Text.PlainText
     color: root.dim
     font.family: root.fontFamily
     font.pixelSize: Style.font.bodySmall

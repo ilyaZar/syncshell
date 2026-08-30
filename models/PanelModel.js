@@ -164,6 +164,8 @@ function deviceName(devices, deviceId) {
 }
 
 function localDeviceName(syncthing, fallback) {
+  var displayName = String(syncthing && syncthing.displayDeviceName || "")
+  if (displayName) return displayName
   var id = String(syncthing && syncthing.localDeviceId || "")
   var devices = syncthing && syncthing.devices ? syncthing.devices : []
   for (var i = 0; i < devices.length; i++) {

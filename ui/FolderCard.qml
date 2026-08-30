@@ -100,6 +100,7 @@ BorderSurface {
       id: stateText
       anchors.centerIn: parent
       text: root.stateLabel
+      textFormat: Text.PlainText
       color: root.stateColor
       font.family: root.fontFamily
       font.pixelSize: Style.font.caption
@@ -134,6 +135,7 @@ BorderSurface {
     Text {
       width: parent.width
       text: root.meta
+      textFormat: Text.PlainText
       color: root.problem ? root.urgent : root.dim
       font.family: root.fontFamily
       font.pixelSize: Style.font.caption
@@ -144,6 +146,7 @@ BorderSurface {
       visible: root.canOpen
       width: parent.width
       text: String(root.folder.path || "")
+      textFormat: Text.PlainText
       color: root.dim
       font.family: root.fontFamily
       font.pixelSize: Style.font.caption

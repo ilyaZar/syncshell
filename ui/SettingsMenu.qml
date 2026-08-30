@@ -41,6 +41,7 @@ Item {
             width: parent.width
             bottomPadding: Style.spacing.sm
             text: "SETTINGS"
+            textFormat: Text.PlainText
             color: Color.menu.text
             font.family: root.fontFamily
             font.pixelSize: Style.font.caption

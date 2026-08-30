@@ -27,6 +27,7 @@ Row {
   Text {
     id: activityLabel
     text: root.active ? "File syncing" : " "
+    textFormat: Text.PlainText
     color: root.syncColor
     font.family: root.fontFamily
     font.pixelSize: root.fontSize
@@ -39,6 +40,7 @@ Row {
 
     Text {
       text: root.active ? root.dots : ""
+      textFormat: Text.PlainText
       color: root.syncColor
       font.family: root.fontFamily
       font.pixelSize: root.fontSize
@@ -48,6 +50,7 @@ Row {
       id: dotsProbe
       visible: false
       text: "..."
+      textFormat: Text.PlainText
       font.family: root.fontFamily
       font.pixelSize: root.fontSize
     }
@@ -57,6 +60,7 @@ Row {
     width: Math.max(0, root.width - activityLabel.implicitWidth
       - dotsSlot.width)
     text: root.active ? " " + root.detail : ""
+    textFormat: Text.PlainText
     color: root.actionColor()
     font.family: root.fontFamily
     font.pixelSize: root.fontSize

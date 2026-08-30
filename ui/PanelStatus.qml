@@ -89,6 +89,7 @@ Column {
           deviceMetaRow.width - (copyHostIdButton.visible
             ? copyHostIdButton.width + Style.space(4) : 0)))
         text: root.controller.localDeviceName.toUpperCase()
+        textFormat: Text.PlainText
         color: Qt.darker(root.foreground, 1.4)
         font.family: root.fontFamily
         font.pixelSize: Style.font.caption
@@ -123,6 +124,7 @@ Column {
     visible: root.controller.visibleWarning !== ""
     width: parent.width
     text: root.controller.visibleWarning
+    textFormat: Text.PlainText
     color: root.warning
     font.family: root.fontFamily
     font.pixelSize: Style.font.bodySmall
@@ -133,6 +135,7 @@ Column {
     visible: root.controller.visibleError !== ""
     width: parent.width
     text: root.controller.visibleError
+    textFormat: Text.PlainText
     color: root.urgent
     font.family: root.fontFamily
     font.pixelSize: Style.font.bodySmall
@@ -143,6 +146,7 @@ Column {
     visible: root.controller.displayedNotice !== ""
     width: parent.width
     text: root.controller.displayedNotice
+    textFormat: Text.PlainText
     opacity: root.controller.noticeShown ? 1 : 0
     color: root.success
     font.family: root.fontFamily

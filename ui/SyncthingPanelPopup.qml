@@ -313,6 +313,7 @@ KeyboardPanel {
         text: root.controller.settingsMenuOpen
             ? "MOVE (j/k or Up/Down)  SELECT (Enter)  BACK (q/Esc)"
             : "[r]escan all  [w]eb UI  [p]ause/continue  [s]ettings"
+        textFormat: Text.PlainText
         color: root.controller.dim
         font.family: root.controller.fontFamily
         font.pixelSize: Style.font.caption

@@ -17,6 +17,7 @@ RowLayout {
 
   Text {
     text: root.label
+    textFormat: Text.PlainText
     color: root.foreground
     opacity: 0.6
     font.family: root.fontFamily

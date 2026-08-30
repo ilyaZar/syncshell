@@ -22,6 +22,7 @@ Column {
     width: parent.width
     text: root.syncthing && root.syncthing.online
       ? "No folders configured." : "Folder status is unavailable."
+    textFormat: Text.PlainText
     color: root.dim
     font.family: root.fontFamily
     font.pixelSize: Style.font.body

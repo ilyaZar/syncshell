@@ -60,6 +60,7 @@ Item {
           anchors.right: parent.right
           anchors.top: parent.top
           text: root.message
+          textFormat: Text.PlainText
           color: root.foreground
           font.family: root.fontFamily
           font.pixelSize: Style.font.body
@@ -99,6 +100,7 @@ Item {
               Text {
                 anchors.centerIn: parent
                 text: modelData
+                textFormat: Text.PlainText
                 color: destructive
                   ? (selected ? Color.urgent : root.foreground)
                   : (selected ? root.selectedText : root.foreground)

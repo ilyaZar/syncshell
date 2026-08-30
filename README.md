@@ -184,7 +184,7 @@ Planned work stays at the top. Shipped entries come from
 
 | Release | State   | Date       | What changed                                            |
 | ------- | ------- | ---------- | ------------------------------------------------------- |
-| Next    | planned | TBD        | improve and expand Syncthing Web UI customization       |
+| 0.1.8   | planned | TBD        | improve and expand Syncthing Web UI customization       |
 |         |         |            | prepare broader Quickshell compatibility                |
 | 0.1.7   | shipped | 2026-08-31 | fix persistent service-state reconciliation             |
 |         |         |            | UI/UX: clear semantics on buttons, harmonize font size  |

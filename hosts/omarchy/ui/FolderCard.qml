@@ -9,6 +9,7 @@ BorderSurface {
   property bool selected: false
   property bool online: false
   property bool mutationBusy: false
+  property bool rescanning: false
   property string stateLabel: "UNKNOWN"
   property color stateColor: foreground
   property string meta: ""
@@ -19,6 +20,7 @@ BorderSurface {
   property color foreground: Color.foreground
   property color dim: Qt.darker(foreground, 1.5)
   property color urgent: Color.urgent
+  property color warning: "#ebcb8b"
   property color success: "#a3be8c"
   property color syncColor: "#26B6DB"
   property string fontFamily: Style.font.family
@@ -26,8 +28,8 @@ BorderSurface {
   readonly property bool problem: folder && folder.problem
   readonly property bool syncing: folder && folder.syncing
   readonly property bool canOpen: folder && String(folder.path || "") !== ""
-  readonly property color cardBorderColor: problem
-    ? urgent : (syncing ? foreground : dim)
+  readonly property color cardBorderColor: rescanning
+    ? warning : (problem ? urgent : (syncing ? foreground : dim))
 
   signal openRequested
   signal forgetRequested
@@ -154,7 +156,7 @@ BorderSurface {
     }
   }
 
-  Button {
+  BusyButton {
     id: folderActionButton
     z: 1
     visible: root.folder
@@ -164,17 +166,20 @@ BorderSurface {
     height: openFolderButton.height
     iconText: root.folder.paused ? "󰅙" : "󰑐"
     text: root.folder.paused ? "FORGET" : "RESCAN"
+    busyText: "RESCANNING"
+    busy: root.rescanning
     tooltipText: root.folder.paused
       ? "Remove only this unlinked Syncthing configuration"
       : "Rescan this folder for local changes"
     bordered: true
     foreground: root.folder.paused ? root.urgent : root.foreground
+    busyForeground: root.warning
     fontFamily: root.fontFamily
     fontSize: Style.font.body
     iconSize: Style.font.body
     horizontalPadding: Style.space(6)
     verticalPadding: Style.space(2)
-    enabled: root.online && !root.mutationBusy
+    canActivate: root.online && !root.mutationBusy
     onClicked: {
       if (root.folder.paused) root.forgetRequested()
       else root.rescanRequested()

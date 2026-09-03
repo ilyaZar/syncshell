@@ -12,6 +12,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/omarchy-QOL/syncshell/core/internal/syncthing"
 )
@@ -25,6 +26,81 @@ type actionAPI struct {
 	rescans           int
 	lastAdd           syncthing.FolderConfig
 	dropThemeResponse bool
+	rescanStarted     chan struct{}
+	rescanRelease     chan struct{}
+}
+
+func TestRescanPublishesBusyBeforeSlowRequestCompletes(t *testing.T) {
+	directory := t.TempDir()
+	api := &actionAPI{
+		folders: map[string]syncthing.Folder{"folder": {
+			ID: "folder", Label: "Folder", Path: directory,
+		}},
+		devices:       []syncthing.Device{{DeviceID: "LOCAL"}},
+		pending:       syncthing.PendingFolders{},
+		theme:         "default",
+		rescanStarted: make(chan struct{}, 1),
+		rescanRelease: make(chan struct{}, 1),
+	}
+	t.Cleanup(func() {
+		select {
+		case api.rescanRelease <- struct{}{}:
+		default:
+		}
+	})
+	coreSession := newActionSession(t, api)
+	if _, err := coreSession.Refresh(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+
+	published := make(chan PublishedSnapshot, 8)
+	results := make(chan ActionResult, 1)
+	go func() {
+		results <- coreSession.Act(context.Background(), "folder.rescan",
+			ActionArguments{FolderID: "folder"}, "slow-rescan",
+			func(snapshot PublishedSnapshot) { published <- snapshot })
+	}()
+
+	select {
+	case snapshot := <-published:
+		mutation := snapshot.State.Mutation
+		if !mutation.Busy || mutation.ID != "slow-rescan" ||
+			mutation.Action != "folder.rescan" {
+			t.Fatalf("first rescan state is not busy: %#v", mutation)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("rescan busy state was not published immediately")
+	}
+	select {
+	case <-api.rescanStarted:
+	case <-time.After(2 * time.Second):
+		t.Fatal("rescan request did not start")
+	}
+	select {
+	case result := <-results:
+		t.Fatalf("rescan completed before release: %#v", result)
+	default:
+	}
+	api.rescanRelease <- struct{}{}
+
+	select {
+	case result := <-results:
+		if !result.OK {
+			t.Fatalf("rescan failed after release: %#v", result)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("rescan did not complete after release")
+	}
+	for {
+		select {
+		case snapshot := <-published:
+			if !snapshot.State.Mutation.Busy {
+				return
+			}
+		case <-time.After(2 * time.Second):
+			t.Fatal("rescan terminal state was not published")
+		}
+	}
 }
 
 func TestFolderActionsAndMutationState(t *testing.T) {
@@ -77,6 +153,14 @@ func TestFolderActionsAndMutationState(t *testing.T) {
 	if !result.OK || api.rescanCount() != 2 {
 		t.Fatalf("rescan-all failed: %#v count=%d", result, api.rescanCount())
 	}
+	api.setFolderPaused("folder", true)
+	result = coreSession.Act(context.Background(), "folder.rescan-all",
+		ActionArguments{}, "all-paused", nil)
+	if result.OK || result.Error == nil || result.Error.Code != "folder_paused" ||
+		api.rescanCount() != 2 {
+		t.Fatalf("all-paused rescan was accepted: %#v", result)
+	}
+	api.setFolderPaused("folder", false)
 
 	if err := os.WriteFile(filepath.Join(existing, "retained.txt"), []byte("retained"), 0o600); err != nil {
 		t.Fatal(err)
@@ -132,7 +216,12 @@ func TestSuggestionThemeAndActionShape(t *testing.T) {
 	if _, err := coreSession.Refresh(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	result := coreSession.Act(context.Background(), "folder.suggest-id",
+	result := coreSession.Act(context.Background(), "folder.rescan-all",
+		ActionArguments{}, "empty-rescan", nil)
+	if result.OK || result.Error == nil || result.Error.Code != "folder_missing" {
+		t.Fatalf("empty rescan-all was accepted: %#v", result)
+	}
+	result = coreSession.Act(context.Background(), "folder.suggest-id",
 		ActionArguments{}, "1", nil)
 	data, ok := result.Data.(map[string]string)
 	if !result.OK || !ok || data["folderId"] != "abcdefghij" {
@@ -288,6 +377,15 @@ func (a *actionAPI) ServeHTTP(writer http.ResponseWriter, request *http.Request)
 		a.write(writer, `{"random":"ABCDEFGHIJ"}`)
 	case request.URL.Path == "/rest/db/scan":
 		a.rescans++
+		if a.rescanStarted != nil {
+			select {
+			case a.rescanStarted <- struct{}{}:
+			default:
+			}
+		}
+		if a.rescanRelease != nil {
+			<-a.rescanRelease
+		}
 		writer.WriteHeader(http.StatusOK)
 	case request.URL.Path == "/rest/db/file":
 		name := request.URL.Query().Get("file")
@@ -317,6 +415,14 @@ func (a *actionAPI) hasFolder(id string) bool {
 	defer a.mu.Unlock()
 	_, exists := a.folders[id]
 	return exists
+}
+
+func (a *actionAPI) setFolderPaused(id string, paused bool) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	folder := a.folders[id]
+	folder.Paused = paused
+	a.folders[id] = folder
 }
 
 func (a *actionAPI) rescanCount() int {

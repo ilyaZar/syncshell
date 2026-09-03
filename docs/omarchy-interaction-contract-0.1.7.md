@@ -47,15 +47,18 @@ phase 01 baseline and phase 04 comparison. It does not prescribe a new design.
 
 - Each folder card opens its directory, copies its folder ID, shows the folder
   status and path, and offers `RESCAN` when active or `FORGET` when paused.
-- Status badges are `SYNCED`, `SYNCING`, `LINKED`, `UNLINKED`, `ERROR`, or
-  `UNKNOWN` with the released colors and precedence.
+- Status badges are `SYNCED`, `SYNCING`, `RESCANNING`, `LINKED`, `UNLINKED`,
+  `ERROR`, or `UNKNOWN` with the released colors and precedence.
 - Current file activity displays `File syncing`, aligned animated dots, and a
   file detail. Upload and removal use their released green and red wording.
 - `More` and `Less` toggle the extended controls.
 - The selected-folder controls offer `+`, `LINK`, `UNLINK`, or `WAIT`.
 - Pending unencrypted offers appear with `ACCEPT`. Encrypted offers direct the
   user to the Syncthing Web UI.
-- `Rescan all directories` and the `r` key rescan every folder when allowed.
+- `Rescan all folders` and the `r` key rescan every linked folder when allowed.
+- An accepted single or global rescan immediately makes its target buttons
+  inert, rotates their refresh glyphs, changes their labels, and marks target
+  cards as `RESCANNING`. Every terminal result clears that optimistic state.
 
 ## Add and forget flows
 

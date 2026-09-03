@@ -101,7 +101,8 @@ Action arguments are exact:
 - `folder.pause`, `folder.resume`, `folder.rescan`, and `folder.forget` take
   `folderId`.
 - `folder.rescan-all`, `folder.suggest-id`, and lifecycle actions take an empty
-  object.
+  object. A global rescan requires at least one linked folder and asks
+  Syncthing to scan all linked folders.
 - `folder.add-existing` takes `folderId`, `path`, optional `label`, bounded
   `deviceIds`, and optional `pendingDeviceId`.
 - `webui.set-theme` takes `theme`.

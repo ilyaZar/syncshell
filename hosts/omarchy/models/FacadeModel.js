@@ -80,6 +80,22 @@ function syncingFiles(activity) {
   return projected
 }
 
+function linkedFolderIds(folders) {
+  var ids = []
+  var source = folders || []
+  for (var i = 0; i < source.length; i++) {
+    var folder = source[i] || ({})
+    if (!folder.paused && folder.id) ids.push(String(folder.id))
+  }
+  return ids
+}
+
+function rescanTargets(action, folderId, folders) {
+  if (action === "rescan" && folderId) return [String(folderId)]
+  if (action === "rescan-all") return linkedFolderIds(folders)
+  return []
+}
+
 function lifecyclePresentation(lifecycle) {
   var state = lifecycle || ({})
   return {

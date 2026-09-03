@@ -45,6 +45,8 @@ QtObject {
     FacadeModel.folderStatuses(state.folders)
   readonly property var syncingFiles: FacadeModel.syncingFiles(activity)
   readonly property int folderCount: Number(counts.folders || 0)
+  readonly property int rescannableFolderCount:
+    FacadeModel.linkedFolderIds(folders).length
   readonly property int deviceCount: Number(counts.devices || 0)
   readonly property int connectedDeviceCount:
     Number(counts.connectedDevices || 0)
@@ -96,6 +98,7 @@ QtObject {
   property string folderMutationAction: ""
   property string folderMutationError: ""
   property string folderMutationNotice: ""
+  property var folderRescanIds: []
   property string recentlyLinkedFolderId: ""
   property bool folderPreparationBusy: false
   property string folderPreparationError: ""
@@ -197,6 +200,40 @@ QtObject {
     return String(error && error.message || fallback || "Action failed")
   }
 
+  function notify(message) {
+    if (!message) return
+    Quickshell.execDetached([
+      "omarchy-notification-send", "Syncthing", String(message)
+    ])
+  }
+
+  function clearFolderAction() {
+    folderMutationBusy = false
+    folderMutationAction = ""
+    folderMutationId = ""
+    folderRescanIds = []
+  }
+
+  function finishFolderAction(contractAction, folderId, notice) {
+    clearFolderAction()
+    if (contractAction === "link") {
+      recentlyLinkedFolderId = String(folderId || "")
+      linkedTimer.restart()
+    }
+    folderMutationNotice = String(notice || "")
+    if (!folderMutationNotice) return
+    noticeTimer.restart()
+    notify(folderMutationNotice)
+  }
+
+  function failFolderAction(error, fallback) {
+    var notifyFailure = folderMutationAction === "rescan"
+      || folderMutationAction === "rescan-all"
+    clearFolderAction()
+    folderMutationError = actionError(error, fallback)
+    if (notifyFailure) notify(folderMutationError)
+  }
+
   function runFolderAction(action, contractAction, folderId, args, notice) {
     if (!online || folderMutationBusy) {
       folderMutationError = online
@@ -208,41 +245,34 @@ QtObject {
     folderMutationAction = contractAction
     folderMutationId = String(folderId || "")
     folderMutationError = ""
+    noticeTimer.stop()
     folderMutationNotice = ""
+    folderRescanIds = FacadeModel.rescanTargets(
+      contractAction, folderId, folders)
     var id = core.action(action, args || ({}), function(ok, revision, data, error) {
-      root.folderMutationBusy = false
-      root.folderMutationAction = ""
-      root.folderMutationId = ""
       if (!ok) {
-        root.folderMutationError = root.actionError(error,
+        root.failFolderAction(error,
           "Could not complete the folder operation")
         return
       }
-      if (contractAction === "link") {
-        root.recentlyLinkedFolderId = String(folderId || "")
-        linkedTimer.restart()
-      }
-      root.folderMutationNotice = String(notice || "")
-      if (root.folderMutationNotice) {
-        noticeTimer.restart()
-        Quickshell.execDetached([
-          "omarchy-notification-send", "Syncthing", root.folderMutationNotice
-        ])
-      }
+      root.finishFolderAction(contractAction, folderId, notice)
     })
     if (id) return true
-    folderMutationBusy = false
-    folderMutationAction = ""
-    folderMutationId = ""
-    folderMutationError = "Native core is not ready"
+    failFolderAction(null, "Native core is not ready")
     return false
   }
 
-  function folderLabel(folderId) {
+  function configuredFolder(folderId) {
+    var wanted = String(folderId || "")
     for (var i = 0; i < folders.length; i++) {
-      if (folders[i].id === folderId) return folders[i].label || folderId
+      if (String(folders[i].id || "") === wanted) return folders[i]
     }
-    return folderId
+    return null
+  }
+
+  function folderLabel(folderId) {
+    var folder = configuredFolder(folderId)
+    return folder ? folder.label || folderId : folderId
   }
 
   function setFolderLinked(folderId, linked) {
@@ -256,13 +286,30 @@ QtObject {
   }
 
   function rescanFolder(folderId) {
+    var folder = configuredFolder(folderId)
+    if (!folder) {
+      folderMutationError = "The selected folder is no longer configured"
+      return false
+    }
+    if (folder.paused) {
+      folderMutationError = "Link the folder before rescanning it"
+      return false
+    }
     return runFolderAction("folder.rescan", "rescan", folderId,
-      { folderId: folderId }, "Rescan requested for " + folderLabel(folderId))
+      { folderId: folderId }, "Rescan complete for " + folderLabel(folderId))
   }
 
   function rescanAllFolders() {
+    if (folders.length === 0) {
+      folderMutationError = "No folders are configured"
+      return false
+    }
+    if (rescannableFolderCount === 0) {
+      folderMutationError = "No linked folders are available to rescan"
+      return false
+    }
     return runFolderAction("folder.rescan-all", "rescan-all", "", {},
-      "Rescan complete for all directories")
+      "Rescan complete for all folders")
   }
 
   function forgetFolder(folderId) {
@@ -375,6 +422,12 @@ QtObject {
       "--lifecycle-unit", "syncthing.service"
     ]
     onProtocolReadyChanged: if (protocolReady) root.configureCore()
+    onRunningChanged: {
+      if (!running && root.folderMutationBusy) {
+        root.failFolderAction(null,
+          "Folder operation stopped because native core became unavailable")
+      }
+    }
   }
 
   property SettingsController settings: SettingsController {

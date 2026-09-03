@@ -169,18 +169,19 @@ Panel {
   }
 
   function folderMeta(folder) {
-    return PanelModel.folderMeta(folder)
+    return PanelModel.folderMeta(folder, folderRescanning(folder))
   }
 
   function folderState(folder) {
     return PanelModel.folderState(folder,
       syncthing ? syncthing.recentlyLinkedFolderId : "",
-      folderHasActivity(folder))
+      folderHasActivity(folder), folderRescanning(folder))
   }
 
   function folderStateColor(folder) {
     var state = folderState(folder)
     if (state === "UNLINKED") return warning
+    if (state === "RESCANNING") return warning
     if (state === "SYNCING") return warning
     if (state === "ERROR") return urgent
     return success
@@ -189,6 +190,12 @@ Panel {
   function folderHasActivity(folder) {
     return folder && syncthing && visibleSyncActivity !== ""
       && syncthing.syncActivityFolderId === folder.id
+  }
+
+  function folderRescanning(folder) {
+    if (!folder || !syncthing || folder.paused) return false
+    if (folder.scanning) return true
+    return syncthing.folderRescanIds.indexOf(String(folder.id || "")) >= 0
   }
 
   function selectedFolder() {

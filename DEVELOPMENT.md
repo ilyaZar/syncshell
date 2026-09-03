@@ -43,6 +43,8 @@ mise exec aqua:koalaman/shellcheck@0.11.0 -- \
   shellcheck hosts/omarchy/scripts/*.sh packaging/bundled/*.sh tests/*.sh
 qml6 --apptype core -f tests/run.qml
 bash tests/scripts.test.sh
+bash tests/busy-button.test.sh
+bash tests/rescan-core-loss.test.sh
 bash tests/architecture.test.sh
 bash tests/native-core-architecture.test.sh
 bash tests/omarchy-service-contract.test.sh

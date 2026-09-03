@@ -13,7 +13,7 @@ shell adapters remain future work.
 - select the switch/toggle in the top right to start or stop the user service
 - select a folder card to open its directory
 - select **+** to configure an existing local directory
-- select **RESCAN** on a folder or **Rescan all directories** for every folder
+- select **RESCAN** on a folder or **Rescan all folders** for linked folders
 - select **Open Web UI** for device setup and advanced folder options
 - select the gear or press `s` for appearance settings and clean removal
 
@@ -176,6 +176,12 @@ deletions.
 **UNLINK** pauses the selected folder and **LINK** resumes it. Both actions use
 Syncthing's reversible `paused` setting; they do not create filesystem links or
 change device sharing.
+
+An accepted rescan changes its target button to `RESCANNING` immediately and
+rotates the refresh glyph while the request is active. A single-folder rescan
+marks only that linked folder. **Rescan all folders** marks every linked folder
+and is unavailable when all configured folders are paused. Success, failure,
+cancellation, or native-core loss always clears the temporary rescan state.
 
 **FORGET** is available for an unlinked folder. It removes that folder from the
 local Syncthing configuration without deleting its directory or data. Its Folder

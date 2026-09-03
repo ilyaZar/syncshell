@@ -130,7 +130,17 @@ func (s *Session) rescanAll(ctx context.Context) ActionResult {
 		return ActionResult{Error: publicError(err)}
 	}
 	if len(folders) == 0 {
-		return ActionResult{OK: true, Revision: s.Current().Revision}
+		return rejected("folder_missing", "no folders are configured")
+	}
+	linked := false
+	for _, folder := range folders {
+		if !folder.Paused {
+			linked = true
+			break
+		}
+	}
+	if !linked {
+		return rejected("folder_paused", "no linked folders are available to rescan")
 	}
 	if err := s.client.Rescan(ctx, ""); err != nil {
 		return ActionResult{Error: publicError(err)}

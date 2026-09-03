@@ -114,8 +114,8 @@ KeyboardPanel {
             }
             if (root.controller.forgetConfirmOpen)
                 return;
-            if (key === "r" && rescanAllButton.enabled) {
-                root.controller.syncthing.rescanAllFolders();
+            if (key === "r") {
+                rescanAllButton.activate();
             } else if (key === "w")
                 root.controller.openWebUi();
             else if (key === "p")
@@ -186,6 +186,7 @@ KeyboardPanel {
                     foreground: root.controller.foreground
                     dim: root.controller.dim
                     urgent: root.controller.urgent
+                    warning: root.controller.warning
                     warning: root.controller.warning
                     success: root.controller.success
                     fontFamily: root.controller.fontFamily
@@ -261,20 +262,22 @@ KeyboardPanel {
         Row {
             spacing: Style.space(8)
 
-            Button {
+            BusyButton {
                 id: rescanAllButton
                 iconText: "󰑐"
-                text: root.controller.syncthing
+                text: "Rescan all folders"
+                busyText: "Rescanning..."
+                busy: root.controller.syncthing
                     && root.controller.syncthing.folderMutationAction
                         === "rescan-all"
-                    ? "Rescanning…" : "Rescan all directories"
                 bordered: true
                 foreground: root.controller.foreground
+                busyForeground: root.controller.warning
                 fontFamily: root.controller.fontFamily
                 iconSize: Style.font.body
-                enabled: root.controller.syncthing
+                canActivate: root.controller.syncthing
                     && root.controller.syncthing.online
-                    && root.controller.syncthing.folderCount > 0
+                    && root.controller.syncthing.rescannableFolderCount > 0
                     && !root.controller.syncthing.refreshing
                     && !root.controller.syncthing.folderMutationBusy
                 onClicked: root.controller.syncthing.rescanAllFolders()

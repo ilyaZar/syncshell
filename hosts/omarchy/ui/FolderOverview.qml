@@ -10,6 +10,7 @@ Column {
   property color foreground: Color.foreground
   property color dim: Qt.darker(foreground, 1.5)
   property color urgent: Color.urgent
+  property color warning: "#ebcb8b"
   property color success: "#a3be8c"
   property color syncColor: "#26B6DB"
   property string fontFamily: Style.font.family
@@ -45,6 +46,7 @@ Column {
         online: root.syncthing ? root.syncthing.online : false
         mutationBusy: root.syncthing
           ? root.syncthing.folderMutationBusy : false
+        rescanning: root.controller.folderRescanning(modelData)
         stateLabel: root.controller.folderState(modelData)
         stateColor: root.controller.folderStateColor(modelData)
         meta: root.controller.folderMeta(modelData)
@@ -55,6 +57,7 @@ Column {
         foreground: root.foreground
         dim: root.dim
         urgent: root.urgent
+        warning: root.warning
         success: root.success
         syncColor: root.syncColor
         fontFamily: root.fontFamily

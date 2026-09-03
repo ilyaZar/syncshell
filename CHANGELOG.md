@@ -10,6 +10,8 @@ Notable changes to Syncthing for Omarchy are documented here.
   without exposing controls for an unrelated inactive user service
 - bundle one reproducible static Linux x86_64 executable with a public JSONL
   protocol and keep credentials, REST, events, lifecycle, and mutations in Go
+- make accepted single and global rescans visible immediately with rotating,
+  inert controls and explicit optimistic folder state
 - preserve ordinary 0.1.7 fast-forward updates with a required standard shell
   restart before Syncshell is used again
 

@@ -23,29 +23,30 @@ from the `v0.1.7` Git history rather than the 0.1.8 runtime tree.
 
 ## Connection, identity, and models
 
-| Property               | Type   | Meaning                                |
-| ---------------------- | ------ | -------------------------------------- |
-| `phase`                | string | current connection or install phase    |
-| `online`               | bool   | authenticated API state is ready       |
-| `refreshing`           | bool   | a visible refresh is open              |
-| `lastError`            | string | sanitized connection error             |
-| `recoveryWarning`      | string | discovery or recovery progress         |
-| `baseUrl`              | string | URL used by the Web UI action          |
-| `localDeviceId`        | string | live local device ID                   |
-| `displayDeviceId`      | string | live or remembered device ID           |
-| `displayDeviceName`    | string | live or remembered device name         |
-| `connections`          | object | Syncthing connection response          |
-| `devices`              | array  | configured device objects              |
-| `folders`              | array  | configured folder objects              |
-| `pendingFolders`       | object | offers by folder and device            |
-| `folderStatuses`       | object | status keyed by folder ID              |
-| `syncingFiles`         | array  | bounded active file tokens             |
-| `folderCount`          | int    | configured folder count                |
-| `deviceCount`          | int    | configured device count                |
-| `connectedDeviceCount` | int    | local plus connected devices           |
-| `folderProblemCount`   | int    | folders with state or pull errors      |
-| `syncingFolderCount`   | int    | folders with remaining items           |
-| `summaryText`          | string | panel summary for the current state    |
+| Property                 | Type   | Meaning                                |
+| ------------------------ | ------ | -------------------------------------- |
+| `phase`                  | string | current connection or install phase    |
+| `online`                 | bool   | authenticated API state is ready       |
+| `refreshing`             | bool   | a visible refresh is open              |
+| `lastError`              | string | sanitized connection error             |
+| `recoveryWarning`        | string | discovery or recovery progress         |
+| `baseUrl`                | string | URL used by the Web UI action          |
+| `localDeviceId`          | string | live local device ID                   |
+| `displayDeviceId`        | string | live or remembered device ID           |
+| `displayDeviceName`      | string | live or remembered device name         |
+| `connections`            | object | Syncthing connection response          |
+| `devices`                | array  | configured device objects              |
+| `folders`                | array  | configured folder objects              |
+| `pendingFolders`         | object | offers by folder and device            |
+| `folderStatuses`         | object | status keyed by folder ID              |
+| `syncingFiles`           | array  | bounded active file tokens             |
+| `folderCount`            | int    | configured folder count                |
+| `rescannableFolderCount` | int    | linked folders eligible for rescan     |
+| `deviceCount`            | int    | configured device count                |
+| `connectedDeviceCount`   | int    | local plus connected devices           |
+| `folderProblemCount`     | int    | folders with state or pull errors      |
+| `syncingFolderCount`     | int    | folders with remaining items           |
+| `summaryText`            | string | panel summary for the current state    |
 
 The released phases are `discovering`, `loading`, `ready`, `error`, `stopped`,
 and installation states. The panel treats `phase === "ready"` as online in
@@ -101,6 +102,7 @@ lifecycle controls.
 | `folderMutationAction`   | string | current folder action                |
 | `folderMutationError`    | string | current mutation failure             |
 | `folderMutationNotice`   | string | successful mutation notice           |
+| `folderRescanIds`        | array  | optimistic linked rescan targets     |
 | `recentlyLinkedFolderId` | string | recently resumed folder highlight    |
 | `folderPreparationBusy`  | bool   | ID suggestion is in progress         |
 | `folderPreparationError` | string | ID suggestion failure                |
@@ -113,6 +115,12 @@ Only one mutation is accepted at a time. A false method result means the
 request was rejected before asynchronous work began. Forgetting removes only
 the Syncthing folder record and never local data. Add requires an existing,
 canonical, non-overlapping path and a unique ID.
+
+An accepted rescan publishes its optimistic target IDs before the API request
+starts. The host keeps the matching buttons inert, rotates their refresh
+glyphs, and presents `RESCANNING` until success, failure, cancellation, or core
+loss clears the targets. A global rescan targets linked folders only and is
+rejected when no linked folder is available.
 
 ## Activity and host settings
 
@@ -144,7 +152,7 @@ not inferred.
 - `requestFolderIdSuggestion()` requests one new folder ID.
 - `setFolderLinked(id, linked)` resumes or pauses a verified folder.
 - `rescanFolder(id)` rescans one active folder.
-- `rescanAllFolders()` rescans all folders.
+- `rescanAllFolders()` rescans every linked folder.
 - `forgetFolder(id)` forgets one verified paused folder.
 - `addFolder(path, label, id, devices, offer)` adds one existing local
   directory.

@@ -102,11 +102,12 @@ function formatBytes(value) {
     : bytes.toFixed(bytes >= 10 ? 0 : 1)) + " " + units[unit]
 }
 
-function folderMeta(folder) {
+function folderMeta(folder, rescanning) {
   var suffix = folder.configuredLabel && folder.configuredLabel !== folder.label
     ? " · " + folder.configuredLabel : ""
   if (folder.problem) return (folder.error || "Folder needs attention") + suffix
   if (folder.paused) return "Syncing paused" + suffix
+  if (rescanning) return "Scanning local changes" + suffix
   if (folder.scanning) return "Scanning local changes" + suffix
   if (folder.syncing) {
     var remaining = formatCount(folder.needItems) + " item"
@@ -122,12 +123,13 @@ function folderMeta(folder) {
     + formatBytes(folder.globalBytes) + suffix
 }
 
-function folderState(folder, recentlyLinkedFolderId, hasActivity) {
+function folderState(folder, recentlyLinkedFolderId, hasActivity, rescanning) {
   if (!folder) return "UNKNOWN"
   if (folder.paused) return "UNLINKED"
   if (folder.problem) return "ERROR"
+  if (rescanning || folder.scanning) return "RESCANNING"
   if (recentlyLinkedFolderId === folder.id) return "LINKED"
-  if (folder.syncing || folder.scanning || hasActivity) return "SYNCING"
+  if (folder.syncing || hasActivity) return "SYNCING"
   return "SYNCED"
 }
 

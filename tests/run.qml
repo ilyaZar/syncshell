@@ -33,6 +33,10 @@ QtObject {
     compare(PanelModel.folderState(rows[0], ""), "SYNCED", "folder state")
     compare(PanelModel.folderState(rows[0], "", true), "SYNCING",
       "active folder state")
+    compare(PanelModel.folderMeta(rows[0], true),
+      "Scanning local changes · Configured label", "rescan folder metadata")
+    compare(PanelModel.folderState(rows[0], "", false, true),
+      "RESCANNING", "optimistic rescan state")
     compare(PanelModel.localDeviceName({
       displayDeviceName: "optiplex-sff",
       localDeviceId: "",
@@ -116,6 +120,16 @@ QtObject {
         pullErrors: 2
       }
     }]).folder.errors, 1, "folder error projection")
+    compare(FacadeModel.linkedFolderIds([
+      { id: "linked", paused: false },
+      { id: "paused", paused: true }
+    ]), ["linked"], "linked rescan targets")
+    compare(FacadeModel.rescanTargets("rescan", "linked", []),
+      ["linked"], "single rescan target")
+    compare(FacadeModel.rescanTargets("rescan-all", "", [
+      { id: "linked", paused: false },
+      { id: "paused", paused: true }
+    ]), ["linked"], "global rescan targets")
   }
 
   function testDriftPresentation() {

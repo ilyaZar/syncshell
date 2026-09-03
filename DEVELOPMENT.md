@@ -35,7 +35,7 @@ Run the complete released suite from the repository root:
 git diff --check
 jq empty manifest.json
 omarchy plugin validate .
-qmllint -I /usr/share/omarchy/shell Panel.qml Service.qml \
+/usr/lib/qt6/bin/qmllint -I /usr/share/omarchy/shell Panel.qml Service.qml \
   shared/*.qml hosts/omarchy/*.qml hosts/omarchy/controllers/*.qml \
   hosts/omarchy/ui/*.qml tests*.qml
 bash -n hosts/omarchy/scripts/*.sh packaging/bundled/*.sh tests/*.sh
@@ -97,6 +97,13 @@ Never point the harness at the owner's normal Syncthing configuration. The
 standalone surface is a maintained contract test, not a supported 0.1.8 host.
 
 The interactive VM parity gate runs `tests/native-core-parity-vm.test.sh`
-against an explicitly supplied temporary core binary. It creates two isolated
-loopback-only Syncthing nodes and records only credential-free results under the
-VM artifact directory.
+against the explicitly supplied bundled core path. It creates two isolated
+loopback-only Syncthing nodes and records only credential-free results under
+the VM artifact directory.
+
+`packaging/bundled/SHA256SUMS` is the sole tracked checksum list for the
+bundled artifact.
+
+An update from 0.1.7 requires the user's ordinary shell restart before the
+plugin is used again. Do not retain the removed QML helpers to bridge that
+restart boundary.

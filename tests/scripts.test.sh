@@ -25,6 +25,9 @@ test_settings() {
   grep -Eq '^probe_interval_seconds[[:space:]]*=[[:space:]]*15$' "$target" \
     || fail "service probe interval was not seeded"
 
+  printf '%s\n' '' '# retained owner comment' '[future]' \
+    'retained_value = "untouched"' >>"$target"
+
   bash "$root/hosts/omarchy/scripts/syncthing-settings.sh" set-service-state \
     "$root/hosts/omarchy/config/settings.toml" "$target" themed disabled \
     >/dev/null
@@ -34,6 +37,10 @@ test_settings() {
     || fail "service state update created a duplicate"
   grep -Eq '^icon_style[[:space:]]*=[[:space:]]*"themed"' "$target" \
     || fail "service state update changed icon style"
+  grep -Fxq '# retained owner comment' "$target" \
+    || fail "service state update removed an owner comment"
+  grep -Fxq 'retained_value = "untouched"' "$target" \
+    || fail "service state update removed an additive field"
 
   local legacy="$test_root/settings/config/legacy.toml"
   printf '%s\n' \

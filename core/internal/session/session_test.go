@@ -123,7 +123,8 @@ func TestRescanIsValidatedAndSerialized(t *testing.T) {
 	if _, err := coreSession.Refresh(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	if result := coreSession.Rescan(context.Background(), "missing"); result.OK ||
+	if result := coreSession.Act(context.Background(), "folder.rescan",
+		ActionArguments{FolderID: "missing"}, "missing", nil); result.OK ||
 		result.Error == nil || result.Error.Code != "folder_missing" {
 		t.Fatalf("missing folder result: %#v", result)
 	}
@@ -134,7 +135,8 @@ func TestRescanIsValidatedAndSerialized(t *testing.T) {
 		wait.Add(1)
 		go func() {
 			defer wait.Done()
-			results <- coreSession.Rescan(context.Background(), "folder")
+			results <- coreSession.Act(context.Background(), "folder.rescan",
+				ActionArguments{FolderID: "folder"}, "concurrent", nil)
 		}()
 	}
 	wait.Wait()

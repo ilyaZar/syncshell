@@ -11,10 +11,15 @@ the stable plugin ID `io.github.ilyazar.syncthing`. The panel resolves the
 service with `bar.shell.serviceFor(moduleName)`.
 
 An Omarchy plugin update can hot-load the new panel while the kept 0.1.7
-service remains alive. Before the user's ordinary shell restart, that new panel
-must use this contract unchanged. After restart, the same panel contract is
-provided by the native-backed facade. No restart prompt, automatic restart,
-alias, or second runtime is part of the contract.
+service remains alive. Syncshell 0.1.8 deliberately removes that service's QML
+runtime and helper paths instead of retaining a compatibility runtime. After a
+0.1.7 update, the user must perform the ordinary shell restart before using
+Syncshell again. The native-backed facade provides this same panel contract
+after restart.
+
+The plugin does not restart the shell automatically and does not retain an
+alias, fallback, or second runtime. The released QML source remains available
+from the `v0.1.7` Git history rather than the 0.1.8 runtime tree.
 
 ## Connection, identity, and models
 

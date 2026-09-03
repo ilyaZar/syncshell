@@ -197,7 +197,8 @@ func TestBoundedPublicSnapshotFitsOneFrame(t *testing.T) {
 		})
 	}
 	var output bytes.Buffer
-	err := WritePublished(&output, session.PublishedSnapshot{Revision: 1, State: state})
+	err := writeSnapshot(&output,
+		session.PublishedSnapshot{Revision: 1, State: state})
 	if err != nil {
 		t.Fatal(err)
 	}

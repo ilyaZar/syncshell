@@ -2,10 +2,10 @@
   "schemaVersion": 1,
   "id": "io.github.ilyazar.syncthing",
   "name": "Syncthing",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "author": "ilyaZar",
   "license": "MIT AND MPL-2.0",
-  "description": "A Syncthing plugin to monitor file changes, see syncing information, safely manage folders, and control the service and settings. Includes a Web UI theme that follows the Omarchy system theme.",
+  "description": "A Syncthing plugin with a bundled native core for monitoring file activity, safely managing folders, controlling the user service, and following the Omarchy theme.",
   "kinds": ["service", "bar-widget"],
   "keepLoaded": true,
   "entryPoints": {
@@ -14,7 +14,7 @@
   },
   "barWidget": {
     "displayName": "Syncthing",
-    "description": "A Syncthing plugin to monitor file changes, see syncing information, safely manage folders, and control the service and settings. Includes a Web UI theme that follows the Omarchy system theme.",
+    "description": "Monitor Syncthing file activity, safely manage folders, control the user service, and follow the Omarchy theme through one bundled native core.",
     "category": "Files",
     "allowMultiple": false,
     "defaultSection": "right",

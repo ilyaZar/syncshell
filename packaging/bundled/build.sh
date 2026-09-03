@@ -15,5 +15,5 @@ chmod 755 -- "$output"
 (
   cd -- "$root"
   sha256sum bin/x86_64/syncshell-core \
-    >packaging/bundled/syncshell-core.sha256
+    >packaging/bundled/SHA256SUMS
 )

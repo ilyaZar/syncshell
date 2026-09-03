@@ -42,4 +42,8 @@ Replaced REST, credential, event, state, folder, and lifecycle QML code was
 deleted from its original paths.
 There is no mixed runtime, fallback, alias, or feature flag.
 
+The released QML implementation remains available in the `v0.1.7` Git history,
+not in the 0.1.8 runtime. Users restart the shell after updating from 0.1.7 so
+the kept service is replaced atomically by the native-backed service.
+
 The future host directories are README-only in 0.1.8 and make no support claim.

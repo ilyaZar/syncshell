@@ -54,17 +54,13 @@ function parse(raw) {
     var header = line.match(/^\[([A-Za-z_][A-Za-z0-9_-]*)\]$/)
     if (header) {
       section = header[1]
-      if (section !== "style" && section !== "service") {
-        return { error: "Unknown settings section " + section
-          + " on line " + (i + 1) }
-      }
       if ((section === "style" && styleSectionSeen)
           || (section === "service" && serviceSectionSeen)) {
         return { error: "Duplicate settings section " + section
           + " on line " + (i + 1) }
       }
       if (section === "style") styleSectionSeen = true
-      else serviceSectionSeen = true
+      else if (section === "service") serviceSectionSeen = true
       continue
     }
     var assignment = line.match(/^([A-Za-z_][A-Za-z0-9_-]*)\s*=\s*(.+)$/)
@@ -85,6 +81,7 @@ function parse(raw) {
     var styleSetting = key === "icon_style" || key === "web_ui_theme"
     var serviceSetting = key === "service_state"
       || key === "probe_interval_seconds"
+    if (section && section !== "style" && section !== "service") continue
     if ((section === "service" && !serviceSetting)
         || (section !== "service" && !styleSetting)) {
       return { error: "Unknown setting " + (section ? section + "." : "")

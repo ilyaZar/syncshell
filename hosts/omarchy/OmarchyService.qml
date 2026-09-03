@@ -393,7 +393,7 @@ QtObject {
   }
 
   property Connections settingsConnections: Connections {
-    target: settings
+    target: root.settings
     function onSettingsReadyChanged() { root.configureCore() }
     function onProbeIntervalSecondsChanged() { root.configureCore() }
     function onServiceStateChanged() { root.configureCore() }

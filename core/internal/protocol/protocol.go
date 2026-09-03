@@ -309,11 +309,6 @@ func writeSnapshot(writer io.Writer, published session.PublishedSnapshot) error 
 		Revision: published.Revision, State: published.State})
 }
 
-// WritePublished writes one complete snapshot frame.
-func WritePublished(writer io.Writer, published session.PublishedSnapshot) error {
-	return writeSnapshot(writer, published)
-}
-
 func writeFrame(writer io.Writer, value any) error {
 	encoded, err := json.Marshal(value)
 	if err != nil {

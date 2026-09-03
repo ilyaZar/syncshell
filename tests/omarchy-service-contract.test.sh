@@ -39,5 +39,12 @@ grep -Fxq 'OmarchyPanel {}' "$root/Panel.qml" \
   || fail "root panel is not a thin delegate"
 grep -Fxq 'OmarchyService {}' "$root/Service.qml" \
   || fail "root service is not a thin delegate"
+grep -Fq 'must perform the ordinary shell restart before using' \
+  "$root/docs/omarchy-service-contract-0.1.7.md" \
+  || fail "0.1.7 update restart boundary is not documented"
+if rg -n 'new panel.*retained|Before the user.*ordinary shell restart' \
+    "$root/docs/omarchy-service-contract-0.1.7.md" >/dev/null; then
+  fail "service contract still promises pre-restart compatibility"
+fi
 
 printf '%s\n' 'Omarchy service contract test passed'

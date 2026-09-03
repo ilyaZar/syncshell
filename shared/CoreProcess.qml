@@ -1,5 +1,4 @@
 import QtQuick
-import Quickshell
 import Quickshell.Io
 
 QtObject {
@@ -319,6 +318,6 @@ QtObject {
   property Timer shutdownTimer: Timer {
     interval: 1000
     repeat: false
-    onTriggered: if (coreProcess.running) coreProcess.signal(15)
+    onTriggered: if (root.coreProcess.running) root.coreProcess.signal(15)
   }
 }

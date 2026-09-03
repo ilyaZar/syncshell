@@ -12,7 +12,7 @@ type SystemVersion struct {
 	Version string `json:"version"`
 }
 
-// Device is the configured-device wire shape required by phase 02.
+// Device is the configured-device wire shape used by the client.
 type Device struct {
 	DeviceID  string `json:"deviceID"`
 	Name      string `json:"name"`
@@ -24,7 +24,7 @@ type FolderDevice struct {
 	DeviceID string `json:"deviceID"`
 }
 
-// Folder is the configured-folder wire shape required by phase 02.
+// Folder is the configured-folder wire shape used by the client.
 type Folder struct {
 	ID         string         `json:"id"`
 	Label      string         `json:"label"`

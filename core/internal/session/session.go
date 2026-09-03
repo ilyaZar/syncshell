@@ -339,8 +339,3 @@ func (s *Session) publishDesiredState(desired string) {
 	s.current.State.Lifecycle.DesiredState = desired
 	s.current.Revision++
 }
-
-// Rescan retains the focused phase-02 call surface.
-func (s *Session) Rescan(ctx context.Context, folderID string) ActionResult {
-	return s.Act(ctx, "folder.rescan", ActionArguments{FolderID: folderID}, "", nil)
-}

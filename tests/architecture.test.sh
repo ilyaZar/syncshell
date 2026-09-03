@@ -25,6 +25,14 @@ for entry_point in manifest.json Panel.qml Service.qml; do
     || fail "$entry_point must be a regular root entry point"
 done
 
+jq -e '.version == "0.1.8"' "$root/manifest.json" >/dev/null \
+  || fail "manifest is not the 0.1.8 candidate"
+[[ -f $root/packaging/bundled/SHA256SUMS ]] \
+  || fail "canonical bundled checksum list is missing"
+[[ $(find "$root/packaging/bundled" -maxdepth 1 -type f \
+  \( -iname '*sha256*' -o -name SHA256SUMS \) | wc -l) -eq 1 ]] \
+  || fail "bundled artifact has duplicate checksum lists"
+
 if find "$root" \
     -path "$root/.git" -prune -o \
     -path "$root/TODO" -prune -o \

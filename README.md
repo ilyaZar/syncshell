@@ -2,9 +2,9 @@
 
 Syncshell (**Sync**thing + quick**shell**) is a plugin to show Syncthing file
 activity from the Omarchy bar. The plugin can manage local folders, open
-Syncthing's Web UI, control the user service, and many more. Version 0.1.8 will
-replace its Syncthing engine with a native core while retaining Omarchy as the
-supported host. Other shell adapters remain future work.
+Syncthing's Web UI, control the user service, and many more. Version 0.1.8 uses
+one bundled native core while retaining Omarchy as the supported host. Other
+shell adapters remain future work.
 
 ![Syncthing status and installation controls](preview.png)
 
@@ -28,6 +28,30 @@ Syncthing**. The plugin runs `omarchy pkg add syncthing`, then enables and
 starts `syncthing.service`. If Syncthing is already installed, the plugin should
 auto-detect this.
 
+Syncshell 0.1.8 supports Linux x86_64 Omarchy systems. Its static native core
+is bundled at `bin/x86_64/syncshell-core`; startup never downloads or builds an
+executable and never falls back to `$PATH`. The reproducible build and SHA-256
+verification scripts live under `packaging/bundled/`.
+
+Omarchy is the only supported host in 0.1.8. The standalone surface is a
+development contract harness. Caelestia, DankMaterialShell,
+Illogical Impulse, Waybar, ARM, multiple instances, and a daemon mode remain
+unsupported future work.
+
+## Upgrade from 0.1.7
+
+Update through Omarchy, then restart the shell before opening Syncshell:
+
+```bash
+omarchy plugin update io.github.ilyazar.syncthing
+omarchy-restart-shell
+```
+
+The restart replaces the kept 0.1.7 QML service with the 0.1.8 native-backed
+service. Syncshell intentionally does not retain the removed QML runtime or its
+helper paths, and it does not restart the shell automatically. Plugin settings
+and bar placement survive the ordinary update and restart.
+
 ## Keybindings
 
 As shown in the footer at the bottom of the main plugin menu
@@ -47,7 +71,8 @@ The settings menu opens `~/.config/omarchy/ilyazar.syncthing/settings.toml` in
 the default editor. The file is created only when it is first opened, and
 changes apply when saved. New files use configuration version `1`, with
 appearance options grouped under the `[style]` section. Existing files are never
-overwritten.
+overwritten. Unknown additive sections are retained and ignored; unknown fields
+inside the owned `[style]` and `[service]` sections remain validation errors.
 
 - `style.icon_style = "branded"` uses the classic Syncthing bar icon. Use
   `themed` for an icon colored by the active Omarchy theme.
@@ -177,27 +202,30 @@ and sharing.
 Folder management and Web UI theming use Syncthing's granular configuration and
 system-path APIs and require Syncthing 1.21.0 or later.
 
+The current Web UI integration preserves the released Omarchy workflow. A
+modernized Web UI belongs to a later shell release and is not part of 0.1.8.
+
 ## Roadmap and prior releases
 
 Planned work stays at the top. Shipped entries come from
 [CHANGELOG.md](CHANGELOG.md), newest first.
 
-| Release | State   | Date       | What changed                                            |
-| ------- | ------- | ---------- | ------------------------------------------------------- |
-| 0.1.8   | planned | TBD        | use one native core without changing the Omarchy panel  |
-|         |         |            | support healthy externally managed Syncthing instances |
-| 0.1.7   | shipped | 2026-08-31 | fix persistent service-state reconciliation             |
-|         |         |            | UI/UX: clear semantics on buttons, harmonize font size  |
-| 0.1.6   | shipped | 2026-08-22 | make live and indexed file activity accurate            |
-|         |         |            | refine folder lifecycle controls and pending offers     |
-|         |         |            | add versioned icon and live Web UI theme settings       |
-|         |         |            | refresh the preview and add four focused demo videos    |
-| 0.1.5   | shipped | 2026-08-20 | add an optional theme-colored bar icon                  |
-| 0.1.4   | shipped | 2026-08-16 | support TLS-enabled local Syncthing APIs                |
-| 0.1.3   | shipped | 2026-08-15 | add a demo video and improve the documentation          |
-| 0.1.2   | shipped | 2026-08-15 | manage Syncthing folders from the bar panel             |
-| 0.1.1   | shipped | 2026-08-14 | monitor installs and show live synchronization activity |
-| 0.1.0   | shipped | 2026-08-12 | first release                                           |
+| Release | State     | Date       | What changed                                            |
+| ------- | --------- | ---------- | ------------------------------------------------------- |
+| 0.1.8   | candidate | TBD        | use one native core without changing the Omarchy panel  |
+|         |           |            | support healthy externally managed Syncthing instances |
+| 0.1.7   | shipped   | 2026-08-31 | fix persistent service-state reconciliation             |
+|         |           |            | UI/UX: clear semantics on buttons, harmonize font size  |
+| 0.1.6   | shipped   | 2026-08-22 | make live and indexed file activity accurate            |
+|         |           |            | refine folder lifecycle controls and pending offers     |
+|         |           |            | add versioned icon and live Web UI theme settings       |
+|         |           |            | refresh the preview and add four focused demo videos    |
+| 0.1.5   | shipped   | 2026-08-20 | add an optional theme-colored bar icon                  |
+| 0.1.4   | shipped   | 2026-08-16 | support TLS-enabled local Syncthing APIs                |
+| 0.1.3   | shipped   | 2026-08-15 | add a demo video and improve the documentation          |
+| 0.1.2   | shipped   | 2026-08-15 | manage Syncthing folders from the bar panel             |
+| 0.1.1   | shipped   | 2026-08-14 | monitor installs and show live synchronization activity |
+| 0.1.0   | shipped   | 2026-08-12 | first release                                           |
 
 ## Remove
 
@@ -219,9 +247,16 @@ These commands do not remove Syncthing configuration or synchronized files.
 
 ## Security and license
 
-The plugin talks only to Syncthing's local API. It keeps the API key in memory
-and does not persist or log it. Like other Omarchy shell plugins, it runs
-unsandboxed, and the API key permits Syncthing configuration changes.
+The native core talks to the selected Syncthing API. It discovers and keeps the
+API key only in Go memory and never sends it through QML, JSONL, arguments,
+settings, logs, fixtures, or screenshots. Like other Omarchy shell plugins, it
+runs unsandboxed, and the API key permits Syncthing configuration changes.
+
+If the panel reports that its native core is unavailable, verify that the
+checkout contains the regular executable at
+`bin/x86_64/syncshell-core`, that its mode is `0755`, and that the machine
+architecture is `x86_64`. `packaging/bundled/verify.sh` checks the complete
+artifact contract.
 
 Plugin code is MIT licensed. Adapted Syncthing status icons are MPL-2.0; their
 source and attribution are documented in `assets/README.md`.

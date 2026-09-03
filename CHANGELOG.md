@@ -4,6 +4,15 @@ Notable changes to Syncthing for Omarchy are documented here.
 
 ## Unreleased
 
+- replace the QML Syncthing engine with one parent-bound native Go core while
+  preserving the complete Omarchy panel and settings workflow
+- fix issue 45 by treating healthy external Syncthing instances as online
+  without exposing controls for an unrelated inactive user service
+- bundle one reproducible static Linux x86_64 executable with a public JSONL
+  protocol and keep credentials, REST, events, lifecycle, and mutations in Go
+- preserve ordinary 0.1.7 fast-forward updates with a required standard shell
+  restart before Syncshell is used again
+
 ## 0.1.7 - 2026-08-31
 
 - reconcile configured and systemd user-service startup states without changing

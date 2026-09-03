@@ -20,7 +20,7 @@ any Linux quickshell build.
 ## Install
 
 ```bash
-omarchy plugin add https://github.com/ilyaZar/syncshell.git --enable
+omarchy plugin add https://github.com/omarchy-QOL/syncshell.git --enable
 ```
 
 Open the widget and expand **More**. If Syncthing is missing, select **Install

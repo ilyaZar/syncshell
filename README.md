@@ -2,9 +2,9 @@
 
 Syncshell (**Sync**thing + quick**shell**) is a plugin to show Syncthing file
 activity from the Omarchy bar. The plugin can manage local folders, open
-Syncthing's Web UI, control the user service, and many more. While originally
-developed for Omarchy its next release will refactor the plugin to be usable on
-any Linux quickshell build.
+Syncthing's Web UI, control the user service, and many more. Version 0.1.8 will
+replace its Syncthing engine with a native core while retaining Omarchy as the
+supported host. Other shell adapters remain future work.
 
 ![Syncthing status and installation controls](preview.png)
 
@@ -184,8 +184,8 @@ Planned work stays at the top. Shipped entries come from
 
 | Release | State   | Date       | What changed                                            |
 | ------- | ------- | ---------- | ------------------------------------------------------- |
-| 0.1.8   | planned | TBD        | improve and expand Syncthing Web UI customization       |
-|         |         |            | prepare broader Quickshell compatibility                |
+| 0.1.8   | planned | TBD        | use one native core without changing the Omarchy panel  |
+|         |         |            | support healthy externally managed Syncthing instances |
 | 0.1.7   | shipped | 2026-08-31 | fix persistent service-state reconciliation             |
 |         |         |            | UI/UX: clear semantics on buttons, harmonize font size  |
 | 0.1.6   | shipped | 2026-08-22 | make live and indexed file activity accurate            |

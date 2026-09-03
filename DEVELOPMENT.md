@@ -57,3 +57,34 @@ Interactive release evidence comes from the repo-owned `syncshell-vm-setup`
 Omarchy profile on `optiplex-sff`. Verify the source commit and snapshot before
 copying code, keep the guest inhibitor active, pull evidence, and fully stop the
 guest afterward.
+
+## Native core development
+
+The phase-02 core and standalone harness are deliberately outside the
+production Omarchy entry points. Run their complete local checks with:
+
+```bash
+go -C core test ./...
+go -C core test -race ./...
+go -C core vet ./...
+tests/core-process.test.sh
+tests/native-core-architecture.test.sh
+tests/native-core-live.test.sh
+```
+
+The live test creates one temporary Syncthing home and Unix GUI socket. It
+disables discovery, relays, NAT traversal, telemetry, and upgrades, then removes
+the complete temporary tree.
+
+To inspect the shell-neutral harness manually, build to a temporary path and
+provide an isolated Syncthing configuration:
+
+```bash
+go -C core build -trimpath -o /tmp/syncshell-core ./cmd/syncshell-core
+SYNCSHELL_CORE_PATH=/tmp/syncshell-core \
+SYNCSHELL_CONFIG_PATH=/path/to/isolated/config.xml \
+  quickshell -p tests-standalone.qml
+```
+
+Never point the harness at the owner's normal Syncthing configuration. The
+standalone surface is a maintained contract test, not a supported 0.1.8 host.

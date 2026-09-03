@@ -1,0 +1,3 @@
+import "hosts/standalone"
+
+StandaloneShell {}

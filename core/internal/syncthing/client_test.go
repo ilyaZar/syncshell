@@ -76,6 +76,55 @@ func TestClientHealthStatusFoldersAndRescan(t *testing.T) {
 	}
 }
 
+func TestRescanConfirmsLongRunningScanAfterTimeout(t *testing.T) {
+	tests := []struct {
+		name     string
+		folderID string
+		state    string
+		wantOK   bool
+	}{
+		{name: "folder scanning", folderID: "folder", state: "scanning", wantOK: true},
+		{name: "global scan waiting", state: "scan-waiting", wantOK: true},
+		{name: "folder idle", folderID: "folder", state: "idle", wantOK: false},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			var started atomic.Bool
+			server := httptest.NewServer(http.HandlerFunc(func(
+				writer http.ResponseWriter,
+				request *http.Request,
+			) {
+				switch request.URL.Path {
+				case "/rest/db/scan":
+					started.Store(true)
+					<-request.Context().Done()
+				case "/rest/config/folders":
+					writeJSON(writer, `[{"id":"folder","paused":false}]`)
+				case "/rest/db/status":
+					if !started.Load() {
+						t.Fatal("folder status read before rescan started")
+					}
+					writeJSON(writer, `{"state":"`+test.state+`"}`)
+				default:
+					http.NotFound(writer, request)
+				}
+			}))
+			defer server.Close()
+
+			client := testClient(t, server.URL, "", false)
+			client.http.Timeout = 50 * time.Millisecond
+			err := client.Rescan(context.Background(), test.folderID)
+			if test.wantOK {
+				if err != nil {
+					t.Fatalf("confirmed rescan failed: %v", err)
+				}
+				return
+			}
+			assertErrorCode(t, err, ErrorTimeout)
+		})
+	}
+}
+
 func TestClientAuthorizationAndSecretRedaction(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
 		http.Error(writer, "rejected "+testAPIKey, http.StatusUnauthorized)

@@ -215,7 +215,36 @@ func (c *Client) Rescan(ctx context.Context, folderID string) error {
 	if folderID != "" {
 		path += "?folder=" + url.QueryEscape(folderID)
 	}
-	return c.request(ctx, http.MethodPost, path, nil, true, nil)
+	err := c.request(ctx, http.MethodPost, path, nil, true, nil)
+	if err == nil || !c.rescanStarted(ctx, folderID, err) {
+		return err
+	}
+	return nil
+}
+
+func (c *Client) rescanStarted(ctx context.Context, folderID string, err error) bool {
+	var requestError *Error
+	if !errors.As(err, &requestError) || requestError.Code != ErrorTimeout {
+		return false
+	}
+	if folderID != "" {
+		status, statusErr := c.FolderStatus(ctx, folderID)
+		return statusErr == nil && strings.HasPrefix(status.State, "scan")
+	}
+	folders, foldersErr := c.Folders(ctx)
+	if foldersErr != nil {
+		return false
+	}
+	for _, folder := range folders {
+		if folder.Paused {
+			continue
+		}
+		status, statusErr := c.FolderStatus(ctx, folder.ID)
+		if statusErr == nil && strings.HasPrefix(status.State, "scan") {
+			return true
+		}
+	}
+	return false
 }
 
 func (c *Client) request(

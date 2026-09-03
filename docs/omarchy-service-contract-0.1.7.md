@@ -11,15 +11,15 @@ the stable plugin ID `io.github.ilyazar.syncthing`. The panel resolves the
 service with `bar.shell.serviceFor(moduleName)`.
 
 An Omarchy plugin update can hot-load the new panel while the kept 0.1.7
-service remains alive. Syncshell 0.1.8 deliberately removes that service's QML
-runtime and helper paths instead of retaining a compatibility runtime. After a
-0.1.7 update, the user must perform the ordinary shell restart before using
-Syncshell again. The native-backed facade provides this same panel contract
-after restart.
+service remains alive. The new panel remains fully usable with the retained
+0.1.7 service until the user's ordinary shell restart activates the new
+native-backed facade. New presentation state is derived from the stable 0.1.7
+surface during that window.
 
-The plugin does not restart the shell automatically and does not retain an
-alias, fallback, or second runtime. The released QML source remains available
-from the `v0.1.7` Git history rather than the 0.1.8 runtime tree.
+The plugin does not restart the shell automatically or retain an alias,
+fallback, or second runtime. The released QML service already in memory is the
+only pre-restart runtime; the new checkout starts only after the normal shell
+restart.
 
 ## Connection, identity, and models
 
@@ -41,7 +41,6 @@ from the `v0.1.7` Git history rather than the 0.1.8 runtime tree.
 | `folderStatuses`         | object | status keyed by folder ID              |
 | `syncingFiles`           | array  | bounded active file tokens             |
 | `folderCount`            | int    | configured folder count                |
-| `rescannableFolderCount` | int    | linked folders eligible for rescan     |
 | `deviceCount`            | int    | configured device count                |
 | `connectedDeviceCount`   | int    | local plus connected devices           |
 | `folderProblemCount`     | int    | folders with state or pull errors      |
@@ -70,7 +69,7 @@ and `globalBytes`. Device objects expose `deviceID`, `name`, and `untrusted`.
 | `canInstall`                 | bool   | install action is safe          |
 | `packageStatus`              | string | installation progress          |
 | `packageError`               | string | installation or status error   |
-| `serviceAvailable`           | bool   | exact user unit is present      |
+| `serviceAvailable`           | bool   | trusted user unit is available  |
 | `serviceActive`              | bool   | observed or pending run state   |
 | `serviceActionRunning`       | bool   | start or stop is in progress    |
 | `canControlService`          | bool   | lifecycle switch may be shown   |
@@ -102,7 +101,6 @@ lifecycle controls.
 | `folderMutationAction`   | string | current folder action                |
 | `folderMutationError`    | string | current mutation failure             |
 | `folderMutationNotice`   | string | successful mutation notice           |
-| `folderRescanIds`        | array  | optimistic linked rescan targets     |
 | `recentlyLinkedFolderId` | string | recently resumed folder highlight    |
 | `folderPreparationBusy`  | bool   | ID suggestion is in progress         |
 | `folderPreparationError` | string | ID suggestion failure                |
@@ -116,11 +114,12 @@ request was rejected before asynchronous work began. Forgetting removes only
 the Syncthing folder record and never local data. Add requires an existing,
 canonical, non-overlapping path and a unique ID.
 
-An accepted rescan publishes its optimistic target IDs before the API request
-starts. The host keeps the matching buttons inert, rotates their refresh
-glyphs, and presents `RESCANNING` until success, failure, cancellation, or core
-loss clears the targets. A global rescan targets linked folders only and is
-rejected when no linked folder is available.
+An accepted rescan publishes the stable mutation action and target ID before
+the API request starts. The panel derives its optimistic targets from those
+fields and the current folder pause state. This works with both the retained
+0.1.7 service and the native facade. The host keeps matching buttons inert,
+rotates their refresh glyphs, and presents `RESCANNING` until success, failure,
+cancellation, or core loss clears the mutation.
 
 ## Activity and host settings
 
@@ -144,7 +143,8 @@ not inferred.
 ## Methods
 
 - `refresh()` refreshes installation and API state.
-- `setRefreshInterval(seconds)` clamps panel polling to 60-3600 seconds.
+- `setRefreshInterval(seconds)` clamps native reconciliation to 60-3600
+  seconds.
 - `setLegacyThemedIcon(enabled)` seeds the implicit icon preference only.
 - `toggleService()` starts or stops an authorized unit.
 - `chooseServiceStateAction(index)` applies the selected drift resolution.

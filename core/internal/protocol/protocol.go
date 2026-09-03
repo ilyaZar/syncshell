@@ -18,9 +18,9 @@ const (
 	// Version is the only supported protocol major.
 	Version = 1
 	// MaxLineBytes bounds every input and output frame including its newline.
-	MaxLineBytes = 1 << 20
-	maxRequestID = 128
-	maxRequests  = 4096
+	MaxLineBytes          = 8 << 20
+	maxRequestID          = 128
+	maxRememberedRequests = 4096
 )
 
 // Build describes the child implementation without source paths.
@@ -86,6 +86,11 @@ type input struct {
 	err  error
 }
 
+type requestIDs struct {
+	seen  map[string]struct{}
+	order []string
+}
+
 // Stream runs one bounded request loop around one session.
 type Stream struct {
 	Session *session.Session
@@ -115,7 +120,7 @@ func (s Stream) Run(ctx context.Context) error {
 	go readLines(streamContext, s.Input, inputs)
 
 	updates := s.Session.Updates(streamContext)
-	seen := make(map[string]struct{})
+	ids := requestIDs{seen: make(map[string]struct{})}
 	for {
 		select {
 		case <-ctx.Done():
@@ -145,7 +150,7 @@ func (s Stream) Run(ctx context.Context) error {
 					Message: "protocol input is invalid"})
 				return incoming.err
 			}
-			shutdown, err := s.handleRequest(ctx, incoming.line, seen, &lastRevision)
+			shutdown, err := s.handleRequest(ctx, incoming.line, &ids, &lastRevision)
 			if err != nil {
 				_ = writeFrame(s.Output, Fatal{V: Version, Type: "fatal",
 					Code: "protocol_request", Message: err.Error()})
@@ -161,10 +166,10 @@ func (s Stream) Run(ctx context.Context) error {
 func (s Stream) handleRequest(
 	ctx context.Context,
 	line []byte,
-	seen map[string]struct{},
+	ids *requestIDs,
 	lastRevision *uint64,
 ) (bool, error) {
-	request, err := validateRequest(line, seen)
+	request, err := validateRequest(line, ids)
 	if err != nil {
 		return false, err
 	}
@@ -186,7 +191,7 @@ func (s Stream) handleRequest(
 	}
 }
 
-func validateRequest(line []byte, seen map[string]struct{}) (request, error) {
+func validateRequest(line []byte, ids *requestIDs) (request, error) {
 	var decoded request
 	if err := decodeStrict(line, &decoded); err != nil {
 		return request{}, errors.New("request is malformed")
@@ -198,13 +203,15 @@ func validateRequest(line []byte, seen map[string]struct{}) (request, error) {
 		strings.ContainsAny(decoded.ID, "\r\n\x00") {
 		return request{}, errors.New("request id is invalid")
 	}
-	if _, exists := seen[decoded.ID]; exists {
+	if _, exists := ids.seen[decoded.ID]; exists {
 		return request{}, errors.New("request id is duplicated")
 	}
-	if len(seen) >= maxRequests {
-		return request{}, errors.New("request limit exceeded")
+	if len(ids.order) == maxRememberedRequests {
+		delete(ids.seen, ids.order[0])
+		ids.order = ids.order[1:]
 	}
-	seen[decoded.ID] = struct{}{}
+	ids.seen[decoded.ID] = struct{}{}
+	ids.order = append(ids.order, decoded.ID)
 	return decoded, nil
 }
 

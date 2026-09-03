@@ -21,7 +21,7 @@ QtObject {
   property int generation: 0
   property int restartAttempts: 0
   readonly property bool running: coreProcess.running
-  readonly property int maxLineLength: 1048575
+  readonly property int maxLineLength: 8388607
   readonly property int maxRestartAttempts: 3
 
   property int _nextId: 0
@@ -182,6 +182,23 @@ QtObject {
     }
   }
 
+  function failPending(message) {
+    var pending = _pending
+    _pending = ({})
+    var ids = Object.keys(pending)
+    if (ids.length === 0) return
+    var failure = {
+      code: "core_unavailable",
+      message: String(message || "Native core became unavailable")
+    }
+    for (var index = 0; index < ids.length; index++) {
+      var id = ids[index]
+      var callback = pending[id]
+      if (callback) callback(false, revision, null, failure)
+      resultReceived(id, false, revision, null, failure)
+    }
+  }
+
   function failProtocol(message) {
     lastError = message
     incompatible = true
@@ -189,7 +206,7 @@ QtObject {
     _expectedStop = true
     _restartRequested = false
     desiredRunning = false
-    _pending = ({})
+    failPending(message)
     if (coreProcess.running) coreProcess.signal(15)
     protocolFailed(message)
   }
@@ -197,7 +214,11 @@ QtObject {
   function handleExit(exitCode) {
     shutdownTimer.stop()
     protocolReady = false
-    _pending = ({})
+    var unexpected = !_restartRequested && !_expectedStop && desiredRunning
+    var message = unexpected
+      ? "core exited unexpectedly with status " + exitCode
+      : "Native core stopped before the request completed"
+    failPending(message)
     if (_restartRequested) {
       _restartRequested = false
       restartTimer.restart()
@@ -205,7 +226,7 @@ QtObject {
     }
     if (_expectedStop || !desiredRunning) return
     unavailable = true
-    lastError = "core exited unexpectedly with status " + exitCode
+    lastError = message
     if (restartAttempts < maxRestartAttempts) {
       restartAttempts++
       restartTimer.interval = Math.min(4000, 250 * Math.pow(2,
@@ -247,13 +268,13 @@ QtObject {
     }
 
     onStarted: {
+      root.failPending("Native core restarted before the request completed")
       root.generation++
       root.protocolReady = false
       root.unavailable = false
       root.lastError = ""
       root.revision = 0
       root.snapshot = ({})
-      root._pending = ({})
       root._expectedStop = false
     }
 
@@ -309,6 +330,7 @@ QtObject {
     interval: 100
     repeat: false
     onTriggered: {
+      root._restartRequested = false
       root._expectedStop = false
       root.desiredRunning = false
       Qt.callLater(function() { root.desiredRunning = true })

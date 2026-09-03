@@ -187,7 +187,6 @@ KeyboardPanel {
                     dim: root.controller.dim
                     urgent: root.controller.urgent
                     warning: root.controller.warning
-                    warning: root.controller.warning
                     success: root.controller.success
                     fontFamily: root.controller.fontFamily
                 }
@@ -277,7 +276,7 @@ KeyboardPanel {
                 iconSize: Style.font.body
                 canActivate: root.controller.syncthing
                     && root.controller.syncthing.online
-                    && root.controller.syncthing.rescannableFolderCount > 0
+                    && root.controller.rescannableFolderCount > 0
                     && !root.controller.syncthing.refreshing
                     && !root.controller.syncthing.folderMutationBusy
                 onClicked: root.controller.syncthing.rescanAllFolders()

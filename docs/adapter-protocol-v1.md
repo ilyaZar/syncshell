@@ -7,7 +7,7 @@ queue.
 ## Transport
 
 - UTF-8 JSON Lines travel over the child's standard input and output.
-- Each line is one JSON object and is at most 1,048,576 bytes including its
+- Each line is one JSON object and is at most 8,388,608 bytes including its
   newline.
 - Standard output contains protocol lines only.
 - Standard error contains bounded, sanitized diagnostics only.
@@ -52,12 +52,17 @@ The complete state object contains these sections:
 - `installation`: host-neutral executable presence and path
 - `mutation`: the one serialized action's busy, error, and result state
 - `counts`: normalized folder, device, connection, problem, and syncing totals
+- `truncation`: explicit counts for collection and folder-error entries omitted
+  by safety bounds
 - `lifecycle`: exact binding, observation, classification, and capabilities
 - `capabilities`: the action names implemented by this core
 
 Every collection and remote string is bounded so the complete snapshot remains
-within the transport line limit. A fresh snapshot replaces the prior state; no
-section is a patch or independently revisioned cache.
+within the transport line limit. The limits cover up to 128 folders, 256
+devices, and 64 sharing relationships per folder. Any omitted entries are
+reported through `truncation` so a host can direct the user to the Web UI. A
+fresh snapshot replaces the prior state; no section is a patch or independently
+revisioned cache.
 
 Every accepted request has a non-empty caller-generated string `id` and exactly
 one result:
@@ -75,9 +80,11 @@ A failed result has a stable machine code and sanitized text:
 {"v":1,"type":"result","id":"9","ok":false,"error":{"code":"folder_missing","message":"folder is no longer configured"}}
 ```
 
-The one `configure` request may update `probeIntervalSeconds` and
-`desiredServiceState`. Both are validated and applied in memory. It cannot
-carry credentials, settings paths, style values, or arbitrary host objects.
+The one `configure` request may update `probeIntervalSeconds`,
+`refreshIntervalSeconds`, and `desiredServiceState`. They are validated and
+applied in memory. Lifecycle probes are lightweight and independent from the
+low-frequency authoritative refresh. Configuration cannot carry credentials,
+settings paths, style values, or arbitrary host objects.
 
 The domain action names are:
 
@@ -129,6 +136,7 @@ still safe, then exits nonzero:
 {"v":1,"type":"fatal","code":"protocol_version","message":"protocol major 1 required"}
 ```
 
-Malformed, duplicate, oversized, or post-shutdown requests never invoke an
-action. A crash is process state owned by the host adapter; it is not
-represented as Syncthing offline.
+Malformed, recent duplicate, oversized, or post-shutdown requests never invoke
+an action. Completed request IDs are remembered in a bounded rolling window;
+the window never imposes a process lifetime. A crash is process state owned by
+the host adapter; it is not represented as Syncthing offline.

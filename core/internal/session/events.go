@@ -37,12 +37,8 @@ func (s *Session) eventLoop(ctx context.Context, updates chan PublishedSnapshot)
 	if retry < 0 {
 		return
 	}
-	if retry > 0 {
-		published, _ := s.Refresh(ctx)
-		emitLatest(updates, published)
-		retry = 0
-	}
-	nextRefresh := time.Now().Add(s.refreshInterval())
+	nextRefresh := time.Now().Add(s.RefreshInterval())
+	nextLifecycle := time.Now().Add(s.ProbeInterval())
 	nextActivity := time.Now().Add(activityCycle)
 	for {
 		events, err := s.client.Events(ctx, cursor, 256, eventPollSeconds, eventTypes)
@@ -51,15 +47,28 @@ func (s *Session) eventLoop(ctx context.Context, updates chan PublishedSnapshot)
 				return
 			}
 			emitLatest(updates, s.setFresh(false))
-			if !waitContext(ctx, retryDelay(retry)) {
+			delay := retryDelay(retry)
+			now := time.Now()
+			for _, deadline := range []time.Time{
+				nextRefresh, nextLifecycle, nextActivity,
+			} {
+				if remaining := deadline.Sub(now); remaining < delay {
+					delay = max(0, remaining)
+				}
+			}
+			if !waitContext(ctx, delay) {
 				return
 			}
 			retry++
+			s.reconcileScheduled(ctx, updates, time.Now(),
+				&nextRefresh, &nextLifecycle, &nextActivity)
 			continue
 		}
 		if retry > 0 {
 			published, _ := s.Refresh(ctx)
 			emitLatest(updates, published)
+			nextRefresh = time.Now().Add(s.RefreshInterval())
+			nextLifecycle = time.Now().Add(s.ProbeInterval())
 			retry = 0
 		}
 		if len(events) > 0 {
@@ -68,26 +77,42 @@ func (s *Session) eventLoop(ctx context.Context, updates chan PublishedSnapshot)
 			if gap || requiresHydration(events) {
 				published, _ := s.Refresh(ctx)
 				emitLatest(updates, published)
+				nextRefresh = time.Now().Add(s.RefreshInterval())
+				nextLifecycle = time.Now().Add(s.ProbeInterval())
 			}
 			if s.processActivityEvents(ctx, events, time.Now()) {
 				emitLatest(updates, s.publishActivity(false, time.Now()))
 			}
 		}
-		now := time.Now()
-		select {
-		case <-s.configChanged:
-			nextRefresh = now
-		default:
-		}
-		if !now.Before(nextActivity) {
-			emitLatest(updates, s.publishActivity(true, now))
-			nextActivity = now.Add(activityCycle)
-		}
-		if !now.Before(nextRefresh) {
-			published, _ := s.Refresh(ctx)
-			emitLatest(updates, published)
-			nextRefresh = now.Add(s.refreshInterval())
-		}
+		s.reconcileScheduled(ctx, updates, time.Now(),
+			&nextRefresh, &nextLifecycle, &nextActivity)
+	}
+}
+
+func (s *Session) reconcileScheduled(
+	ctx context.Context,
+	updates chan PublishedSnapshot,
+	now time.Time,
+	nextRefresh, nextLifecycle, nextActivity *time.Time,
+) {
+	select {
+	case <-s.configChanged:
+		*nextRefresh = now
+		*nextLifecycle = now
+	default:
+	}
+	if !now.Before(*nextActivity) {
+		emitLatest(updates, s.publishActivity(true, now))
+		*nextActivity = now.Add(activityCycle)
+	}
+	if !now.Before(*nextRefresh) {
+		published, _ := s.Refresh(ctx)
+		emitLatest(updates, published)
+		*nextRefresh = now.Add(s.RefreshInterval())
+		*nextLifecycle = now.Add(s.ProbeInterval())
+	} else if !now.Before(*nextLifecycle) {
+		emitLatest(updates, s.refreshLifecycle(ctx))
+		*nextLifecycle = now.Add(s.ProbeInterval())
 	}
 }
 
@@ -95,29 +120,18 @@ func (s *Session) initializeEvents(
 	ctx context.Context,
 	updates chan PublishedSnapshot,
 ) (int64, int) {
-	retry := 0
-	for {
-		events, err := s.client.Events(ctx, 0, 1, 0, eventTypes)
-		if err == nil {
-			if len(events) == 0 {
-				return 0, retry
-			}
-			return events[len(events)-1].ID, retry
-		}
+	events, err := s.client.Events(ctx, 0, 1, 0, eventTypes)
+	if err != nil {
 		emitLatest(updates, s.setFresh(false))
-		if ctx.Err() != nil || !waitContext(ctx, retryDelay(retry)) {
+		if ctx.Err() != nil {
 			return 0, -1
 		}
-		retry++
+		return 0, 1
 	}
-}
-
-func (s *Session) refreshInterval() time.Duration {
-	interval := s.ProbeInterval()
-	if interval > 60*time.Second {
-		return 60 * time.Second
+	if len(events) == 0 {
+		return 0, 0
 	}
-	return interval
+	return events[len(events)-1].ID, 0
 }
 
 func (s *Session) setFresh(fresh bool) PublishedSnapshot {

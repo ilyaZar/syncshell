@@ -20,8 +20,8 @@ QtObject {
   property string _statusOutput: ""
   property string _statusErrorOutput: ""
 
-  readonly property bool canUseRuntime: state === "existing"
-    && executablePath !== ""
+  signal statusApplied
+
   readonly property bool canInstall: state === "missing"
     && !refreshing && !packageActionRunning
 
@@ -55,6 +55,7 @@ QtObject {
     executablePath = String(data.executable || "")
     operationRunning = data.operationRunning === true
     reconcilePackageOperation()
+    statusApplied()
   }
 
   function reconcilePackageOperation() {

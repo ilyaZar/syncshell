@@ -25,6 +25,7 @@ type testAPI struct {
 	inFlight     atomic.Int32
 	maxInFlight  atomic.Int32
 	unauthorized atomic.Bool
+	requests     atomic.Int32
 }
 
 func TestRefreshIsDeterministicAndRevisioned(t *testing.T) {
@@ -73,6 +74,19 @@ func TestTrustedActiveBindingIsManaged(t *testing.T) {
 	lifecycle := published.State.Lifecycle
 	if lifecycle.Classification != "managed" || !lifecycle.CanControl || !lifecycle.TargetMatch {
 		t.Fatalf("trusted active binding was not managed: %#v", lifecycle)
+	}
+}
+
+func TestLifecycleProbeDoesNotHydrateSyncthing(t *testing.T) {
+	api := &testAPI{}
+	coreSession := newTestSession(t, api, "active", "LOCAL-ID")
+	if _, err := coreSession.Refresh(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	before := api.requests.Load()
+	coreSession.refreshLifecycle(context.Background())
+	if after := api.requests.Load(); after != before {
+		t.Fatalf("lifecycle probe made %d Syncthing requests", after-before)
 	}
 }
 
@@ -158,6 +172,11 @@ func TestConfigureValidatesHostNeutralValues(t *testing.T) {
 		t.Fatalf("invalid interval accepted: %#v", result)
 	}
 	seconds := 3
+	invalidRefresh := 59
+	if result := coreSession.Configure(OperationalConfig{
+		RefreshIntervalSeconds: &invalidRefresh}); result.OK || result.Error == nil {
+		t.Fatalf("invalid refresh interval accepted: %#v", result)
+	}
 	invalidState := "invalid"
 	if result := coreSession.Configure(OperationalConfig{
 		ProbeIntervalSeconds: &seconds, DesiredServiceState: &invalidState}); result.OK || coreSession.ProbeInterval() != 15*time.Second {
@@ -168,17 +187,51 @@ func TestConfigureValidatesHostNeutralValues(t *testing.T) {
 		t.Fatal(err)
 	}
 	state := "disabled"
+	refreshSeconds := 90
 	if result := coreSession.Configure(OperationalConfig{
-		ProbeIntervalSeconds: &seconds, DesiredServiceState: &state}); !result.OK {
+		ProbeIntervalSeconds: &seconds, RefreshIntervalSeconds: &refreshSeconds,
+		DesiredServiceState: &state}); !result.OK {
 		t.Fatalf("valid config rejected: %#v", result)
 	}
 	if coreSession.ProbeInterval() != 3*time.Second {
 		t.Fatalf("probe interval is %v", coreSession.ProbeInterval())
 	}
+	if coreSession.RefreshInterval() != 90*time.Second {
+		t.Fatalf("refresh interval is %v", coreSession.RefreshInterval())
+	}
 	after := coreSession.Current()
 	if after.Revision != before.Revision+1 ||
 		after.State.Lifecycle.DesiredState != "disabled" {
 		t.Fatalf("desired lifecycle state was not published: %#v", after)
+	}
+}
+
+func TestCollectionTruncationIsExplicit(t *testing.T) {
+	devices := make([]syncthing.Device, maxDevices+3)
+	folders := make([]syncthing.Folder, maxFolders+2)
+	folders[0].Devices = make([]syncthing.FolderDevice, maxFolderDevices+4)
+	pending := make(syncthing.PendingFolders, maxPendingFolders+2)
+	for index := 0; index < maxPendingFolders+2; index++ {
+		pending[fmt.Sprintf("%03d", index)] = syncthing.PendingFolder{
+			OfferedBy: map[string]syncthing.FolderOffer{},
+		}
+	}
+	first := pending["000"]
+	for index := 0; index < maxPendingOffers+5; index++ {
+		first.OfferedBy[fmt.Sprintf("%03d", index)] = syncthing.FolderOffer{}
+	}
+	pending["000"] = first
+
+	truncation := collectionTruncation(devices, folders, pending)
+	_, truncation.FolderErrors = normalizeFolder(syncthing.Folder{},
+		syncthing.FolderStatus{}, syncthing.FolderErrors{
+			Errors: make([]syncthing.FolderError, maxFolderErrors+6),
+		})
+	if truncation.Devices != 3 || truncation.Folders != 2 ||
+		truncation.FolderDevices != 4 || truncation.FolderErrors != 6 ||
+		truncation.PendingFolders != 2 ||
+		truncation.PendingOffers != 5 {
+		t.Fatalf("unexpected truncation state: %#v", truncation)
 	}
 }
 
@@ -242,6 +295,7 @@ func newTestSession(t *testing.T, api *testAPI, active, expectedID string) *Sess
 }
 
 func (a *testAPI) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
+	a.requests.Add(1)
 	if request.URL.Path != "/rest/noauth/health" &&
 		(a.unauthorized.Load() || request.Header.Get("X-API-Key") != sessionTestKey) {
 		http.Error(writer, "unauthorized "+sessionTestKey, http.StatusUnauthorized)

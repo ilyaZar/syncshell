@@ -80,28 +80,26 @@ function syncingFiles(activity) {
   return projected
 }
 
-function linkedFolderIds(folders) {
-  var ids = []
-  var source = folders || []
-  for (var i = 0; i < source.length; i++) {
-    var folder = source[i] || ({})
-    if (!folder.paused && folder.id) ids.push(String(folder.id))
-  }
-  return ids
-}
-
-function rescanTargets(action, folderId, folders) {
-  if (action === "rescan" && folderId) return [String(folderId)]
-  if (action === "rescan-all") return linkedFolderIds(folders)
-  return []
-}
-
 function lifecyclePresentation(lifecycle) {
   var state = lifecycle || ({})
+  var controllable = state.canControl === true || state.canStart === true
   return {
-    available: state.available === true && state.targetMatch === true,
-    controllable: state.canControl === true || state.canStart === true
+    available: state.targetMatch === true && controllable,
+    controllable: controllable
   }
+}
+
+function truncationWarning(truncation) {
+  var state = truncation || ({})
+  var keys = ["devices", "folders", "folderDevices", "folderErrors",
+    "pendingFolders", "pendingOffers"]
+  for (var i = 0; i < keys.length; i++) {
+    if (Number(state[keys[i]] || 0) > 0) {
+      return "Some Syncthing items exceed panel limits; use the Web UI for "
+        + "the hidden entries"
+    }
+  }
+  return ""
 }
 
 function driftDecision(configState, lifecycle) {

@@ -27,14 +27,12 @@ ShellRoot {
         service.folderMutationBusy = true
         service.folderMutationAction = "rescan"
         service.folderMutationId = "folder"
-        service.folderRescanIds = ["folder"]
         service.core.coreProcess.signal(9)
         return
       }
       if (!root.armed || service.folderMutationBusy) return
       if (service.folderMutationAction !== ""
-          || service.folderMutationId !== ""
-          || service.folderRescanIds.length !== 0) {
+          || service.folderMutationId !== "") {
         root.fail("core loss retained optimistic rescan state")
         return
       }

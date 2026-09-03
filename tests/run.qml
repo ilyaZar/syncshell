@@ -120,16 +120,10 @@ QtObject {
         pullErrors: 2
       }
     }]).folder.errors, 1, "folder error projection")
-    compare(FacadeModel.linkedFolderIds([
-      { id: "linked", paused: false },
-      { id: "paused", paused: true }
-    ]), ["linked"], "linked rescan targets")
-    compare(FacadeModel.rescanTargets("rescan", "linked", []),
-      ["linked"], "single rescan target")
-    compare(FacadeModel.rescanTargets("rescan-all", "", [
-      { id: "linked", paused: false },
-      { id: "paused", paused: true }
-    ]), ["linked"], "global rescan targets")
+    compare(FacadeModel.truncationWarning({}), "", "complete state warning")
+    compare(FacadeModel.truncationWarning({ folderErrors: 1 }),
+      "Some Syncthing items exceed panel limits; use the Web UI for the "
+        + "hidden entries", "truncated state warning")
   }
 
   function testDriftPresentation() {
@@ -142,6 +136,16 @@ QtObject {
       available: false,
       controllable: false
     }, "external lifecycle hidden")
+    compare(FacadeModel.lifecyclePresentation({
+      available: true,
+      targetMatch: true,
+      classification: "external",
+      canControl: false,
+      canStart: false
+    }), {
+      available: false,
+      controllable: false
+    }, "online inactive unit hidden")
     compare(FacadeModel.lifecyclePresentation({
       available: true,
       targetMatch: true,

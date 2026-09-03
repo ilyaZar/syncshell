@@ -12,8 +12,8 @@ Notable changes to Syncthing for Omarchy are documented here.
   protocol and keep credentials, REST, events, lifecycle, and mutations in Go
 - make accepted single and global rescans visible immediately with rotating,
   inert controls and explicit optimistic folder state
-- preserve ordinary 0.1.7 fast-forward updates with a required standard shell
-  restart before Syncshell is used again
+- preserve ordinary 0.1.7 fast-forward updates with a usable panel until the
+  standard shell restart activates the native core
 
 ## 0.1.7 - 2026-08-31
 

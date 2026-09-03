@@ -8,12 +8,12 @@ const (
 	maxIdentifier     = 256
 	maxLabel          = 512
 	maxErrorText      = 1024
-	maxDevices        = 64
-	maxFolders        = 24
-	maxFolderDevices  = 16
+	maxDevices        = 256
+	maxFolders        = 128
+	maxFolderDevices  = 64
 	maxFolderErrors   = 4
-	maxPendingFolders = 12
-	maxPendingOffers  = 8
+	maxPendingFolders = 32
+	maxPendingOffers  = 16
 )
 
 // Error is a sanitized public failure.
@@ -138,6 +138,16 @@ type Counts struct {
 	SyncingFolders   int `json:"syncingFolders"`
 }
 
+// Truncation reports collection entries omitted to preserve protocol bounds.
+type Truncation struct {
+	Devices        int `json:"devices,omitempty"`
+	Folders        int `json:"folders,omitempty"`
+	FolderDevices  int `json:"folderDevices,omitempty"`
+	FolderErrors   int `json:"folderErrors,omitempty"`
+	PendingFolders int `json:"pendingFolders,omitempty"`
+	PendingOffers  int `json:"pendingOffers,omitempty"`
+}
+
 // Snapshot is the complete immutable public state at one revision.
 type Snapshot struct {
 	HostID         string                   `json:"hostId,omitempty"`
@@ -151,6 +161,7 @@ type Snapshot struct {
 	Installation   Installation             `json:"installation"`
 	Mutation       Mutation                 `json:"mutation"`
 	Counts         Counts                   `json:"counts"`
+	Truncation     Truncation               `json:"truncation"`
 	Lifecycle      systemduser.State        `json:"lifecycle"`
 	Capabilities   []string                 `json:"capabilities"`
 }
@@ -163,8 +174,9 @@ type PublishedSnapshot struct {
 
 // OperationalConfig is live, nonsecret host intent.
 type OperationalConfig struct {
-	ProbeIntervalSeconds *int    `json:"probeIntervalSeconds,omitempty"`
-	DesiredServiceState  *string `json:"desiredServiceState,omitempty"`
+	ProbeIntervalSeconds   *int    `json:"probeIntervalSeconds,omitempty"`
+	RefreshIntervalSeconds *int    `json:"refreshIntervalSeconds,omitempty"`
+	DesiredServiceState    *string `json:"desiredServiceState,omitempty"`
 }
 
 // ActionResult is one correlated domain result.

@@ -57,6 +57,8 @@ Panel {
   readonly property int trackedFiles: folderTotal("globalFiles")
   readonly property int scanningFolderCount: folderStateCount("scanning")
   readonly property int pausedFolderCount: folderStateCount("paused")
+  readonly property int rescannableFolderCount:
+    Math.max(0, folderRows.length - pausedFolderCount)
   readonly property bool syncInProgress: syncthing
     ? syncthing.syncingFolderCount > 0 || scanningFolderCount > 0
       || syncthing.syncingFiles.length > 0
@@ -195,7 +197,10 @@ Panel {
   function folderRescanning(folder) {
     if (!folder || !syncthing || folder.paused) return false
     if (folder.scanning) return true
-    return syncthing.folderRescanIds.indexOf(String(folder.id || "")) >= 0
+    if (!syncthing.folderMutationBusy) return false
+    if (syncthing.folderMutationAction === "rescan-all") return true
+    return syncthing.folderMutationAction === "rescan"
+      && syncthing.folderMutationId === String(folder.id || "")
   }
 
   function selectedFolder() {

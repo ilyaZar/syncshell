@@ -2,6 +2,11 @@
 set -euo pipefail
 
 [[ ${1:-} == stream ]]
+shift
+exit_on_request=false
+for argument in "$@"; do
+  [[ $argument != --test-exit-on-request ]] || exit_on_request=true
+done
 
 printf '%s\n' \
   '{"v":1,"type":"hello","build":{"version":"test","protocol":1},"capabilities":[]}' \
@@ -12,6 +17,7 @@ while IFS= read -r line; do
   type=$(jq -er '.type' <<<"$line")
   case $type in
     configure|refresh|action)
+      [[ $exit_on_request == false ]] || exit 17
       printf '{"v":1,"type":"result","id":"%s","ok":true,"revision":1}\n' "$id"
       ;;
     shutdown)

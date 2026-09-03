@@ -39,12 +39,16 @@ grep -Fxq 'OmarchyPanel {}' "$root/Panel.qml" \
   || fail "root panel is not a thin delegate"
 grep -Fxq 'OmarchyService {}' "$root/Service.qml" \
   || fail "root service is not a thin delegate"
-grep -Fq 'must perform the ordinary shell restart before using' \
+rg -Uq 'remains fully usable with the retained[[:space:]]+0[.]1[.]7 service' \
   "$root/docs/omarchy-service-contract-0.1.7.md" \
-  || fail "0.1.7 update restart boundary is not documented"
-if rg -n 'new panel.*retained|Before the user.*ordinary shell restart' \
-    "$root/docs/omarchy-service-contract-0.1.7.md" >/dev/null; then
-  fail "service contract still promises pre-restart compatibility"
-fi
+  || fail "pre-restart service compatibility is not documented"
+
+[[ $(sed -n '/AddFolderForm {/,/^                }/p' \
+  "$root/hosts/omarchy/ui/SyncthingPanelPopup.qml" \
+  | grep -c 'warning: root.controller.warning') -eq 1 ]] \
+  || fail "add-folder warning binding is duplicated"
+grep -Fq '&& (!root.syncthing.serviceAvailable || root.syncthing.serviceActive)' \
+  "$root/hosts/omarchy/ui/PanelStatus.qml" \
+  || fail "external online service is visually dimmed"
 
 printf '%s\n' 'Omarchy service contract test passed'

@@ -26,7 +26,8 @@ omarchy plugin add https://github.com/omarchy-QOL/syncshell.git --enable
 Open the widget and expand **More**. If Syncthing is missing, select **Install
 Syncthing**. The plugin runs `omarchy pkg add syncthing`, then enables and
 starts `syncthing.service`. If Syncthing is already installed, the plugin should
-auto-detect this.
+auto-detect this. The native core retries from package status after a new
+installation creates its first Syncthing configuration.
 
 Syncshell 0.1.8 supports Linux x86_64 Omarchy systems. Its static native core
 is bundled at `bin/x86_64/syncshell-core`; startup never downloads or builds an
@@ -40,17 +41,17 @@ unsupported future work.
 
 ## Upgrade from 0.1.7
 
-Update through Omarchy, then restart the shell before opening Syncshell:
+Update through Omarchy, then restart the shell to activate the native core:
 
 ```bash
 omarchy plugin update io.github.ilyazar.syncthing
 omarchy-restart-shell
 ```
 
-The restart replaces the kept 0.1.7 QML service with the 0.1.8 native-backed
-service. Syncshell intentionally does not retain the removed QML runtime or its
-helper paths, and it does not restart the shell automatically. Plugin settings
-and bar placement survive the ordinary update and restart.
+The updated panel remains usable with the kept 0.1.7 service before that
+restart. The restart then replaces it with the 0.1.8 native-backed service.
+Syncshell does not retain a second runtime or restart the shell automatically.
+Plugin settings and bar placement survive the ordinary update and restart.
 
 ## Keybindings
 
@@ -195,6 +196,10 @@ are explicitly selected.
 Pending unencrypted folder offers can prefill the Folder ID, label, and offering
 device. Encrypted offers and sharing with untrusted devices must be configured
 in the Web UI.
+
+Large collection bounds are explicit. If a configuration exceeds the panel's
+bounded snapshot, the panel shows a warning and the Web UI remains available
+for the omitted entries.
 
 A shared folder must use the same Folder ID on every device. Labels and paths
 may differ. Create the folder on one device, share it, and accept the offer on

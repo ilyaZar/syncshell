@@ -40,7 +40,7 @@ func TestStreamShutdownContract(t *testing.T) {
 func TestStreamConfigureRefreshAndRescan(t *testing.T) {
 	coreSession, rescans := newProtocolSession(t, false)
 	input := strings.NewReader(
-		`{"v":1,"type":"configure","id":"1","config":{"probeIntervalSeconds":2}}` + "\n" +
+		`{"v":1,"type":"configure","id":"1","config":{"probeIntervalSeconds":2,"refreshIntervalSeconds":90}}` + "\n" +
 			`{"v":1,"type":"refresh","id":"2"}` + "\n" +
 			`{"v":1,"type":"action","id":"3","action":"folder.rescan","args":{"folderId":"folder"}}` + "\n" +
 			`{"v":1,"type":"action","id":"4","action":"folder.suggest-id","args":{}}` + "\n" +
@@ -56,6 +56,10 @@ func TestStreamConfigureRefreshAndRescan(t *testing.T) {
 	}
 	if coreSession.ProbeInterval().Seconds() != 2 {
 		t.Fatalf("configure did not update interval: %v", coreSession.ProbeInterval())
+	}
+	if coreSession.RefreshInterval().Seconds() != 90 {
+		t.Fatalf("configure did not update refresh interval: %v",
+			coreSession.RefreshInterval())
 	}
 	frames := decodeFrames(t, output.Bytes())
 	results := make(map[string]map[string]any)
@@ -101,6 +105,26 @@ func TestStreamRejectsMalformedDuplicateAndWrongVersion(t *testing.T) {
 				t.Fatalf("last frame is not fatal: %#v", frames)
 			}
 		})
+	}
+}
+
+func TestRequestIDWindowDoesNotExpireStream(t *testing.T) {
+	ids := requestIDs{seen: make(map[string]struct{})}
+	for index := 0; index < maxRememberedRequests+10; index++ {
+		line := []byte(fmt.Sprintf(`{"v":1,"type":"refresh","id":"%d"}`, index))
+		if _, err := validateRequest(line, &ids); err != nil {
+			t.Fatalf("request %d failed: %v", index, err)
+		}
+	}
+	latest := []byte(fmt.Sprintf(`{"v":1,"type":"refresh","id":"%d"}`,
+		maxRememberedRequests+9))
+	if _, err := validateRequest(latest, &ids); err == nil ||
+		!strings.Contains(err.Error(), "duplicated") {
+		t.Fatalf("recent duplicate was accepted: %v", err)
+	}
+	if _, err := validateRequest(
+		[]byte(`{"v":1,"type":"refresh","id":"0"}`), &ids); err != nil {
+		t.Fatalf("evicted request ID terminated the stream: %v", err)
 	}
 }
 
@@ -160,16 +184,16 @@ func TestBoundedPublicSnapshotFitsOneFrame(t *testing.T) {
 			Version: strings.Repeat("v", 512)},
 		PendingFolders: make(map[string]session.PendingFolder),
 	}
-	for index := 0; index < 64; index++ {
+	for index := 0; index < 256; index++ {
 		state.Devices = append(state.Devices, session.Device{
 			ID: strings.Repeat("d", 256), Name: strings.Repeat("n", 512),
 		})
 	}
-	for index := 0; index < 24; index++ {
+	for index := 0; index < 128; index++ {
 		folder := session.Folder{ID: strings.Repeat("f", 256),
 			Label: strings.Repeat("l", 512), Path: strings.Repeat("p", 4096),
 			Status: session.FolderStatus{State: "idle"}}
-		for range 16 {
+		for range 64 {
 			folder.Devices = append(folder.Devices,
 				session.FolderDevice{ID: strings.Repeat("d", 256)})
 		}
@@ -180,9 +204,9 @@ func TestBoundedPublicSnapshotFitsOneFrame(t *testing.T) {
 		}
 		state.Folders = append(state.Folders, folder)
 	}
-	for index := 0; index < 12; index++ {
+	for index := 0; index < 32; index++ {
 		offers := make(map[string]session.FolderOffer)
-		for offer := 0; offer < 8; offer++ {
+		for offer := 0; offer < 16; offer++ {
 			offers[fmt.Sprintf("device-%d", offer)] = session.FolderOffer{
 				Label: strings.Repeat("l", 512),
 			}

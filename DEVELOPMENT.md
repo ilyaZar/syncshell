@@ -45,6 +45,7 @@ qml6 --apptype core -f tests/run.qml
 bash tests/scripts.test.sh
 bash tests/busy-button.test.sh
 bash tests/rescan-core-loss.test.sh
+bash tests/install-recovery.test.sh
 bash tests/architecture.test.sh
 bash tests/native-core-architecture.test.sh
 bash tests/omarchy-service-contract.test.sh
@@ -106,6 +107,6 @@ the VM artifact directory.
 `packaging/bundled/SHA256SUMS` is the sole tracked checksum list for the
 bundled artifact.
 
-An update from 0.1.7 requires the user's ordinary shell restart before the
-plugin is used again. Do not retain the removed QML helpers to bridge that
-restart boundary.
+The updated panel remains usable with the retained 0.1.7 service until the
+user's ordinary shell restart activates the native facade. Do not retain the
+removed QML helpers or add a second runtime for that boundary.

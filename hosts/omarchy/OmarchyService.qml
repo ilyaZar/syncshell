@@ -18,6 +18,7 @@ QtObject {
   readonly property var webUi: state.webUi || ({})
   readonly property var coreInstallation: state.installation || ({})
   readonly property var counts: state.counts || ({})
+  readonly property var truncation: state.truncation || ({})
   readonly property var lifecyclePresentation:
     FacadeModel.lifecyclePresentation(lifecycle)
 
@@ -30,7 +31,7 @@ QtObject {
   readonly property string lastError: core.lastError
     || String(connection.error && connection.error.message || "")
   readonly property string recoveryWarning: core.starting
-    ? "Starting native core" : ""
+    ? "Starting native core" : FacadeModel.truncationWarning(truncation)
   readonly property string baseUrl: String(webUi.url || "")
   readonly property string localDeviceId: String(identity.deviceId || "")
   readonly property string displayDeviceId: localDeviceId
@@ -45,8 +46,6 @@ QtObject {
     FacadeModel.folderStatuses(state.folders)
   readonly property var syncingFiles: FacadeModel.syncingFiles(activity)
   readonly property int folderCount: Number(counts.folders || 0)
-  readonly property int rescannableFolderCount:
-    FacadeModel.linkedFolderIds(folders).length
   readonly property int deviceCount: Number(counts.devices || 0)
   readonly property int connectedDeviceCount:
     Number(counts.connectedDevices || 0)
@@ -56,13 +55,14 @@ QtObject {
     Number(counts.syncingFolders || 0)
   readonly property string summaryText: summary()
 
-  readonly property string installationState: packageController.state
+  readonly property string installationState: online
+    ? "existing" : packageController.state
   readonly property string installationLabel: packageController.label
   readonly property string executablePath:
     String(coreInstallation.executablePath || packageController.executablePath)
   readonly property bool canUseRuntime: coreInstallation.available === true
     || online
-  readonly property bool canInstall: packageController.canInstall
+  readonly property bool canInstall: !online && packageController.canInstall
   readonly property string packageStatus: packageController.packageStatus
   readonly property string packageError: packageController.packageError
   readonly property bool serviceAvailable: lifecyclePresentation.available
@@ -98,7 +98,6 @@ QtObject {
   property string folderMutationAction: ""
   property string folderMutationError: ""
   property string folderMutationNotice: ""
-  property var folderRescanIds: []
   property string recentlyLinkedFolderId: ""
   property bool folderPreparationBusy: false
   property string folderPreparationError: ""
@@ -171,7 +170,10 @@ QtObject {
   function setRefreshInterval(seconds) {
     var value = parseInt(String(seconds), 10)
     if (!isFinite(value)) value = 60
-    refreshIntervalSec = Math.max(60, Math.min(3600, value))
+    var next = Math.max(60, Math.min(3600, value))
+    if (refreshIntervalSec === next) return
+    refreshIntervalSec = next
+    configureCore()
   }
 
   function setLegacyThemedIcon(enabled) {
@@ -188,10 +190,18 @@ QtObject {
     })) refreshing = false
   }
 
+  function recoverCoreIfNeeded() {
+    if (packageController.state !== "existing" || core.running
+        || core.protocolReady || core.incompatible || !core.executableReady
+        || !core.unavailable || !core.desiredRunning) return false
+    return core.restart()
+  }
+
   function configureCore() {
     if (!core.protocolReady || !settingsReady) return
     core.configure({
       probeIntervalSeconds: probeIntervalSeconds,
+      refreshIntervalSeconds: refreshIntervalSec,
       desiredServiceState: configuredServiceState
     })
   }
@@ -211,7 +221,6 @@ QtObject {
     folderMutationBusy = false
     folderMutationAction = ""
     folderMutationId = ""
-    folderRescanIds = []
   }
 
   function finishFolderAction(contractAction, folderId, notice) {
@@ -247,8 +256,6 @@ QtObject {
     folderMutationError = ""
     noticeTimer.stop()
     folderMutationNotice = ""
-    folderRescanIds = FacadeModel.rescanTargets(
-      contractAction, folderId, folders)
     var id = core.action(action, args || ({}), function(ok, revision, data, error) {
       if (!ok) {
         root.failFolderAction(error,
@@ -302,10 +309,6 @@ QtObject {
   function rescanAllFolders() {
     if (folders.length === 0) {
       folderMutationError = "No folders are configured"
-      return false
-    }
-    if (rescannableFolderCount === 0) {
-      folderMutationError = "No linked folders are available to rescan"
       return false
     }
     return runFolderAction("folder.rescan-all", "rescan-all", "", {},
@@ -443,6 +446,7 @@ QtObject {
     helperPath: root.pluginRoot
       + "/hosts/omarchy/scripts/syncthing-install.sh"
     probeIntervalSeconds: root.probeIntervalSeconds
+    onStatusApplied: root.recoverCoreIfNeeded()
   }
 
   property Connections settingsConnections: Connections {
@@ -450,13 +454,6 @@ QtObject {
     function onSettingsReadyChanged() { root.configureCore() }
     function onProbeIntervalSecondsChanged() { root.configureCore() }
     function onServiceStateChanged() { root.configureCore() }
-  }
-
-  property Timer refreshTimer: Timer {
-    interval: root.refreshIntervalSec * 1000
-    repeat: true
-    running: true
-    onTriggered: root.refresh()
   }
 
   property Timer activityTimer: Timer {

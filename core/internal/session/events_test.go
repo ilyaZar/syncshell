@@ -155,21 +155,7 @@ func TestLocalIndexUsesCurrentFileInformation(t *testing.T) {
 
 func TestEventLoopReconnectsRehydratesAndCancels(t *testing.T) {
 	api := &eventAPI{}
-	server := httptest.NewServer(api)
-	defer server.Close()
-	configPath := filepath.Join(t.TempDir(), "config.xml")
-	config := fmt.Sprintf(`<configuration><gui tls="false"><address>%s</address><apikey>%s</apikey></gui></configuration>`,
-		strings.TrimPrefix(server.URL, "http://"), sessionTestKey)
-	if err := os.WriteFile(configPath, []byte(config), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	coreSession, err := New(context.Background(), Config{
-		Discovery:     syncthing.DiscoveryOptions{ConfigPath: configPath},
-		ProbeInterval: time.Second,
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
+	coreSession := newEventSession(t, api)
 	initial, err := coreSession.Refresh(context.Background())
 	if err != nil || initial.State.WebUI.Theme != "default" {
 		t.Fatalf("initial hydration failed: %#v %v", initial, err)
@@ -195,22 +181,42 @@ func TestEventLoopReconnectsRehydratesAndCancels(t *testing.T) {
 		t.Fatalf("reconnect evidence incomplete: stale=%v calls=%d",
 			sawStale, api.eventCallCount())
 	}
-	cancel()
-	select {
-	case _, open := <-updates:
-		if open {
-			for range updates {
-			}
-		}
-	case <-time.After(3 * time.Second):
-		t.Fatal("event loop did not cancel")
+	cancelEventUpdates(t, cancel, updates)
+}
+
+func TestEventFailuresStillRunScheduledReconciliation(t *testing.T) {
+	api := &eventAPI{alwaysFail: true}
+	coreSession := newEventSession(t, api)
+	if _, err := coreSession.Refresh(context.Background()); err != nil {
+		t.Fatal(err)
 	}
+	coreSession.configMu.Lock()
+	coreSession.probeInterval = 20 * time.Millisecond
+	coreSession.refreshInterval = 50 * time.Millisecond
+	coreSession.configMu.Unlock()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	updates := coreSession.Updates(ctx)
+	deadline := time.After(3 * time.Second)
+	for api.healthCallCount() < 2 {
+		select {
+		case <-updates:
+		case <-deadline:
+			t.Fatal("persistent Event API failure starved reconciliation")
+		}
+	}
+	if api.eventCallCount() < 2 {
+		t.Fatalf("event retry did not continue: %d", api.eventCallCount())
+	}
+	cancelEventUpdates(t, cancel, updates)
 }
 
 type eventAPI struct {
-	mu         sync.Mutex
-	eventCalls int
-	dark       bool
+	mu          sync.Mutex
+	eventCalls  int
+	healthCalls int
+	dark        bool
+	alwaysFail  bool
 }
 
 func (a *eventAPI) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
@@ -218,10 +224,15 @@ func (a *eventAPI) ServeHTTP(writer http.ResponseWriter, request *http.Request) 
 		a.mu.Lock()
 		a.eventCalls++
 		call := a.eventCalls
+		alwaysFail := a.alwaysFail
 		if call == 3 {
 			a.dark = true
 		}
 		a.mu.Unlock()
+		if alwaysFail {
+			http.Error(writer, "temporary", http.StatusServiceUnavailable)
+			return
+		}
 		switch call {
 		case 1:
 			writeSessionJSON(writer, `[{"id":10,"type":"ConfigSaved","data":{}}]`)
@@ -239,6 +250,9 @@ func (a *eventAPI) ServeHTTP(writer http.ResponseWriter, request *http.Request) 
 	a.mu.Unlock()
 	switch request.URL.Path {
 	case "/rest/noauth/health":
+		a.mu.Lock()
+		a.healthCalls++
+		a.mu.Unlock()
 		writeSessionJSON(writer, `{"status":"OK"}`)
 	case "/rest/system/status":
 		writeSessionJSON(writer, `{"myID":"LOCAL"}`)
@@ -267,4 +281,48 @@ func (a *eventAPI) eventCallCount() int {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	return a.eventCalls
+}
+
+func (a *eventAPI) healthCallCount() int {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.healthCalls
+}
+
+func newEventSession(t *testing.T, api *eventAPI) *Session {
+	t.Helper()
+	server := httptest.NewServer(api)
+	t.Cleanup(server.Close)
+	configPath := filepath.Join(t.TempDir(), "config.xml")
+	config := fmt.Sprintf(`<configuration><gui tls="false"><address>%s</address><apikey>%s</apikey></gui></configuration>`,
+		strings.TrimPrefix(server.URL, "http://"), sessionTestKey)
+	if err := os.WriteFile(configPath, []byte(config), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	coreSession, err := New(context.Background(), Config{
+		Discovery:     syncthing.DiscoveryOptions{ConfigPath: configPath},
+		ProbeInterval: time.Second,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return coreSession
+}
+
+func cancelEventUpdates(
+	t *testing.T,
+	cancel context.CancelFunc,
+	updates <-chan PublishedSnapshot,
+) {
+	t.Helper()
+	cancel()
+	select {
+	case _, open := <-updates:
+		if open {
+			for range updates {
+			}
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatal("event loop did not cancel")
+	}
 }

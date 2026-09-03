@@ -38,8 +38,9 @@ Column {
       metaOpacity: 0
       foreground: root.foreground
       fontFamily: root.fontFamily
-      iconOpacity: root.syncthing && root.syncthing.serviceActive
-        && root.syncthing.online ? 1.0 : 0.5
+      iconOpacity: root.syncthing && root.syncthing.online
+        && (!root.syncthing.serviceAvailable || root.syncthing.serviceActive)
+        ? 1.0 : 0.5
       iconComponent: Component {
         Image {
           width: hero.iconSize

@@ -27,6 +27,7 @@ type hydratedState struct {
 	folders        []Folder
 	pendingFolders map[string]PendingFolder
 	webUI          WebUI
+	truncation     Truncation
 }
 
 // Session owns refresh, public state, lifecycle classification, and mutation
@@ -46,6 +47,7 @@ type Session struct {
 
 	configMu            sync.RWMutex
 	probeInterval       time.Duration
+	refreshInterval     time.Duration
 	desiredServiceState string
 	configChanged       chan struct{}
 
@@ -82,6 +84,7 @@ func New(ctx context.Context, config Config) (*Session, error) {
 		binding:             config.Lifecycle,
 		lifecycle:           systemduser.Controller{Command: config.SystemdCommand},
 		probeInterval:       interval,
+		refreshInterval:     60 * time.Second,
 		desiredServiceState: desired,
 		configChanged:       make(chan struct{}, 1),
 		activityRecords:     make(map[string]activityRecord),
@@ -100,6 +103,13 @@ func (s *Session) ProbeInterval() time.Duration {
 	s.configMu.RLock()
 	defer s.configMu.RUnlock()
 	return s.probeInterval
+}
+
+// RefreshInterval returns the current authoritative reconciliation interval.
+func (s *Session) RefreshInterval() time.Duration {
+	s.configMu.RLock()
+	defer s.configMu.RUnlock()
+	return s.refreshInterval
 }
 
 // Refresh rebuilds authoritative state through the one selected client.
@@ -125,7 +135,8 @@ func (s *Session) hydrate(ctx context.Context) (Snapshot, error) {
 		WebUI:          previous.WebUI,
 		Installation: Installation{ExecutablePath: boundedPath(s.executable),
 			Available: s.executable != ""},
-		Mutation: previous.Mutation,
+		Mutation:   previous.Mutation,
+		Truncation: previous.Truncation,
 		Capabilities: []string{
 			"configure", "folder.add-existing", "folder.forget", "folder.pause",
 			"folder.rescan", "folder.rescan-all", "folder.resume", "folder.suggest-id",
@@ -178,6 +189,7 @@ func (s *Session) hydrate(ctx context.Context) (Snapshot, error) {
 	snapshot.PendingFolders = hydrated.pendingFolders
 	snapshot.WebUI = hydrated.webUI
 	snapshot.Counts = normalizedCounts(hydrated.devices, hydrated.folders)
+	snapshot.Truncation = hydrated.truncation
 	snapshot.Connection.Phase = "ready"
 	snapshot.Connection.Online = true
 	snapshot.Connection.Fresh = true
@@ -207,7 +219,7 @@ func (s *Session) loadAuthenticated(
 	if err != nil {
 		return hydratedState{}, err
 	}
-	normalizedFolders, err := s.loadFolders(ctx, folders)
+	normalizedFolders, omittedFolderErrors, err := s.loadFolders(ctx, folders)
 	if err != nil {
 		return hydratedState{}, err
 	}
@@ -223,6 +235,8 @@ func (s *Session) loadAuthenticated(
 	if err != nil {
 		return hydratedState{}, err
 	}
+	truncation := collectionTruncation(devices, folders, pending)
+	truncation.FolderErrors = omittedFolderErrors
 	return hydratedState{
 		identity: Identity{DeviceID: boundedIdentifier(status.MyID),
 			Version: boundedLabel(version.Version)},
@@ -231,24 +245,31 @@ func (s *Session) loadAuthenticated(
 		pendingFolders: normalizePendingFolders(pending),
 		webUI: WebUI{URL: webURL(s.client.Endpoint()), Theme: boundedIdentifier(gui.Theme),
 			GUIAssets: boundedPath(paths.GUIAssets)},
+		truncation: truncation,
 	}, nil
 }
 
-func (s *Session) loadFolders(ctx context.Context, folders []syncthing.Folder) ([]Folder, error) {
+func (s *Session) loadFolders(
+	ctx context.Context,
+	folders []syncthing.Folder,
+) ([]Folder, int, error) {
 	result := make([]Folder, 0, min(len(folders), maxFolders))
+	omittedErrors := 0
 	for _, folder := range folders[:min(len(folders), maxFolders)] {
 		status, err := s.client.FolderStatus(ctx, folder.ID)
 		if err != nil {
-			return nil, err
+			return nil, 0, err
 		}
 		errorsResponse, err := s.client.FolderErrors(ctx, folder.ID)
 		if err != nil {
-			return nil, err
+			return nil, 0, err
 		}
-		result = append(result, normalizeFolder(folder, status, errorsResponse))
+		normalized, omitted := normalizeFolder(folder, status, errorsResponse)
+		result = append(result, normalized)
+		omittedErrors += omitted
 	}
 	sort.Slice(result, func(i, j int) bool { return result[i].ID < result[j].ID })
-	return result, nil
+	return result, omittedErrors, nil
 }
 
 func (s *Session) failedHydration(ctx context.Context, snapshot Snapshot, err error) (Snapshot, error) {
@@ -280,6 +301,31 @@ func (s *Session) probeLifecycle(ctx context.Context, apiOnline bool) systemduse
 	return state
 }
 
+func (s *Session) refreshLifecycle(ctx context.Context) PublishedSnapshot {
+	s.refreshMu.Lock()
+	defer s.refreshMu.Unlock()
+
+	current := s.Current()
+	if current.Revision == 0 {
+		return current
+	}
+	state := s.probeLifecycle(ctx, true)
+	if !current.State.Connection.Online {
+		state = s.failureLifecycle(ctx)
+	}
+
+	s.stateMu.Lock()
+	defer s.stateMu.Unlock()
+	if desired := s.current.State.Lifecycle.DesiredState; desired != "" {
+		state.DesiredState = desired
+	}
+	if !reflect.DeepEqual(s.current.State.Lifecycle, state) {
+		s.current.State.Lifecycle = state
+		s.current.Revision++
+	}
+	return clonePublished(s.current)
+}
+
 func (s *Session) publish(snapshot Snapshot) PublishedSnapshot {
 	s.stateMu.Lock()
 	defer s.stateMu.Unlock()
@@ -299,6 +345,9 @@ func (s *Session) Configure(config OperationalConfig) ActionResult {
 	if config.ProbeIntervalSeconds != nil {
 		s.probeInterval = time.Duration(*config.ProbeIntervalSeconds) * time.Second
 	}
+	if config.RefreshIntervalSeconds != nil {
+		s.refreshInterval = time.Duration(*config.RefreshIntervalSeconds) * time.Second
+	}
 	if config.DesiredServiceState != nil {
 		s.desiredServiceState = *config.DesiredServiceState
 	}
@@ -317,6 +366,14 @@ func validateOperationalConfig(config OperationalConfig) *ActionResult {
 		seconds := *config.ProbeIntervalSeconds
 		if seconds < 1 || seconds > 3600 {
 			result := rejected("invalid_config", "probe interval must be between 1 and 3600 seconds")
+			return &result
+		}
+	}
+	if config.RefreshIntervalSeconds != nil {
+		seconds := *config.RefreshIntervalSeconds
+		if seconds < 60 || seconds > 3600 {
+			result := rejected("invalid_config",
+				"refresh interval must be between 60 and 3600 seconds")
 			return &result
 		}
 	}

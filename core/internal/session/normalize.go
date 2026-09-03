@@ -49,7 +49,7 @@ func normalizeFolder(
 	folder syncthing.Folder,
 	status syncthing.FolderStatus,
 	errorsResponse syncthing.FolderErrors,
-) Folder {
+) (Folder, int) {
 	devices := make([]FolderDevice, 0, min(len(folder.Devices), maxFolderDevices))
 	for _, device := range folder.Devices[:min(len(folder.Devices), maxFolderDevices)] {
 		devices = append(devices, FolderDevice{ID: boundedIdentifier(device.DeviceID)})
@@ -68,16 +68,12 @@ func normalizeFolder(
 			PullErrors: status.PullErrors, NeedTotalItems: status.NeedTotalItems,
 			NeedBytes: status.NeedBytes, GlobalFiles: status.GlobalFiles,
 			GlobalBytes: status.GlobalBytes, Errors: errors},
-	}
+	}, max(0, len(errorsResponse.Errors)-maxFolderErrors)
 }
 
 func normalizePendingFolders(pending syncthing.PendingFolders) map[string]PendingFolder {
 	result := make(map[string]PendingFolder, min(len(pending), maxPendingFolders))
-	folderIDs := make([]string, 0, len(pending))
-	for folderID := range pending {
-		folderIDs = append(folderIDs, folderID)
-	}
-	sort.Strings(folderIDs)
+	folderIDs := sortedPendingFolderIDs(pending)
 	for _, folderID := range folderIDs[:min(len(folderIDs), maxPendingFolders)] {
 		folder := pending[folderID]
 		offers := make(map[string]FolderOffer, min(len(folder.OfferedBy), maxPendingOffers))
@@ -93,6 +89,36 @@ func normalizePendingFolders(pending syncthing.PendingFolders) map[string]Pendin
 		}
 		result[boundedIdentifier(folderID)] = PendingFolder{OfferedBy: offers}
 	}
+	return result
+}
+
+func collectionTruncation(
+	devices []syncthing.Device,
+	folders []syncthing.Folder,
+	pending syncthing.PendingFolders,
+) Truncation {
+	truncation := Truncation{
+		Devices:        max(0, len(devices)-maxDevices),
+		Folders:        max(0, len(folders)-maxFolders),
+		PendingFolders: max(0, len(pending)-maxPendingFolders),
+	}
+	for _, folder := range folders[:min(len(folders), maxFolders)] {
+		truncation.FolderDevices += max(0, len(folder.Devices)-maxFolderDevices)
+	}
+	folderIDs := sortedPendingFolderIDs(pending)
+	for _, folderID := range folderIDs[:min(len(folderIDs), maxPendingFolders)] {
+		truncation.PendingOffers += max(0,
+			len(pending[folderID].OfferedBy)-maxPendingOffers)
+	}
+	return truncation
+}
+
+func sortedPendingFolderIDs(pending syncthing.PendingFolders) []string {
+	result := make([]string, 0, len(pending))
+	for folderID := range pending {
+		result = append(result, folderID)
+	}
+	sort.Strings(result)
 	return result
 }
 

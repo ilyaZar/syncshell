@@ -13,6 +13,7 @@ QtObject {
   property string lifecycleUnit: ""
   property string lifecycleConfig: ""
   property int probeIntervalSeconds: 15
+  property int refreshIntervalSeconds: 60
   property string desiredServiceState: "enabled"
 
   readonly property bool processRunning: core.running
@@ -47,6 +48,7 @@ QtObject {
   function configure(probeSeconds, serviceState) {
     return core.configure({
       probeIntervalSeconds: probeSeconds,
+      refreshIntervalSeconds: refreshIntervalSeconds,
       desiredServiceState: serviceState
     })
   }

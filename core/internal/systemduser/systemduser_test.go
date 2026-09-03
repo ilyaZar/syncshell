@@ -2,10 +2,41 @@ package systemduser
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
+
+func TestApplyUsesExactAuthorizedUnit(t *testing.T) {
+	directory := t.TempDir()
+	record := filepath.Join(directory, "record")
+	command := filepath.Join(directory, "systemctl")
+	script := fmt.Sprintf("#!/bin/sh\nprintf '%%s\\n' \"$*\" >>%q\n", record)
+	if err := os.WriteFile(command, []byte(script), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	controller := Controller{Command: command}
+	for _, action := range []Action{ActionStart, ActionStop, ActionEnable, ActionDisable} {
+		if err := controller.Apply(context.Background(), "syncthing.service", action); err != nil {
+			t.Fatal(err)
+		}
+	}
+	contents, err := os.ReadFile(record)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, action := range []Action{ActionStart, ActionStop, ActionEnable, ActionDisable} {
+		expected := "--user " + string(action) + " syncthing.service"
+		if !strings.Contains(string(contents), expected) {
+			t.Fatalf("missing invocation %q in %q", expected, contents)
+		}
+	}
+	if err := controller.Apply(context.Background(), "../bad.service", ActionStart); err == nil {
+		t.Fatal("invalid unit action succeeded")
+	}
+}
 
 func TestProbeClassifications(t *testing.T) {
 	config := filepath.Join(t.TempDir(), "config.xml")

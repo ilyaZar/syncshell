@@ -2,10 +2,8 @@ package session
 
 import (
 	"context"
-	"errors"
 	"reflect"
 	"sort"
-	"strings"
 	"sync"
 	"time"
 
@@ -24,19 +22,22 @@ type Config struct {
 }
 
 type hydratedState struct {
-	identity Identity
-	devices  []Device
-	folders  []Folder
+	identity       Identity
+	devices        []Device
+	folders        []Folder
+	pendingFolders map[string]PendingFolder
+	webUI          WebUI
 }
 
 // Session owns refresh, public state, lifecycle classification, and mutation
 // serialization for one selected instance.
 type Session struct {
-	hostID    string
-	client    *syncthing.Client
-	target    syncthing.Target
-	binding   systemduser.Binding
-	lifecycle systemduser.Controller
+	hostID     string
+	executable string
+	client     *syncthing.Client
+	target     syncthing.Target
+	binding    systemduser.Binding
+	lifecycle  systemduser.Controller
 
 	refreshMu sync.Mutex
 	actionMu  sync.Mutex
@@ -46,6 +47,13 @@ type Session struct {
 	configMu            sync.RWMutex
 	probeInterval       time.Duration
 	desiredServiceState string
+	configChanged       chan struct{}
+
+	eventsOnce      sync.Once
+	activityMu      sync.Mutex
+	activityRecords map[string]activityRecord
+	activityIndex   int
+	externalLatched bool
 }
 
 // New discovers exactly one target and constructs its sole session.
@@ -67,13 +75,16 @@ func New(ctx context.Context, config Config) (*Session, error) {
 		desired = "enabled"
 	}
 	return &Session{
-		hostID:              bounded(config.HostID),
+		hostID:              boundedIdentifier(config.HostID),
+		executable:          syncthing.FindExecutable(config.Discovery.SyncthingBinary),
 		client:              client,
 		target:              target,
 		binding:             config.Lifecycle,
 		lifecycle:           systemduser.Controller{Command: config.SystemdCommand},
 		probeInterval:       interval,
 		desiredServiceState: desired,
+		configChanged:       make(chan struct{}, 1),
+		activityRecords:     make(map[string]activityRecord),
 	}, nil
 }
 
@@ -104,17 +115,28 @@ func (s *Session) Refresh(ctx context.Context) (PublishedSnapshot, error) {
 func (s *Session) hydrate(ctx context.Context) (Snapshot, error) {
 	previous := s.Current().State
 	snapshot := Snapshot{
-		HostID:       s.hostID,
-		Connection:   Connection{Phase: "loading", Endpoint: s.client.Endpoint()},
-		Identity:     previous.Identity,
-		Devices:      previous.Devices,
-		Folders:      previous.Folders,
-		Capabilities: []string{"configure", "folder.rescan", "refresh"},
+		HostID:         s.hostID,
+		Connection:     Connection{Phase: "loading", Endpoint: s.client.Endpoint()},
+		Identity:       previous.Identity,
+		Devices:        previous.Devices,
+		Folders:        previous.Folders,
+		PendingFolders: previous.PendingFolders,
+		Activity:       previous.Activity,
+		WebUI:          previous.WebUI,
+		Installation: Installation{ExecutablePath: boundedPath(s.executable),
+			Available: s.executable != ""},
+		Mutation: previous.Mutation,
+		Capabilities: []string{
+			"configure", "folder.add-existing", "folder.forget", "folder.pause",
+			"folder.rescan", "folder.rescan-all", "folder.resume", "folder.suggest-id",
+			"lifecycle.disable", "lifecycle.enable", "lifecycle.start", "lifecycle.stop",
+			"refresh", "webui.set-theme",
+		},
 	}
 	if err := s.client.Health(ctx); err != nil {
 		snapshot.Connection.Phase = "error"
 		snapshot.Connection.Error = publicError(err)
-		snapshot.Lifecycle = s.probeLifecycle(ctx, false)
+		snapshot.Lifecycle = s.failureLifecycle(ctx)
 		return snapshot, err
 	}
 	snapshot.Connection.Healthy = true
@@ -123,11 +145,12 @@ func (s *Session) hydrate(ctx context.Context) (Snapshot, error) {
 	if err != nil {
 		snapshot.Connection.Phase = "error"
 		snapshot.Connection.Error = publicError(err)
-		snapshot.Lifecycle = s.probeLifecycle(ctx, false)
+		snapshot.Lifecycle = s.failureLifecycle(ctx)
 		snapshot.Lifecycle.Classification = "external"
 		snapshot.Lifecycle.TargetMatch = false
 		snapshot.Lifecycle.CanControl = false
 		snapshot.Lifecycle.CanStart = false
+		s.externalLatched = true
 		return snapshot, err
 	}
 	snapshot.Connection.Authorized = true
@@ -141,6 +164,7 @@ func (s *Session) hydrate(ctx context.Context) (Snapshot, error) {
 		snapshot.Lifecycle.TargetMatch = false
 		snapshot.Lifecycle.CanControl = false
 		snapshot.Lifecycle.CanStart = false
+		s.externalLatched = true
 		return snapshot, err
 	}
 
@@ -151,11 +175,15 @@ func (s *Session) hydrate(ctx context.Context) (Snapshot, error) {
 	snapshot.Identity = hydrated.identity
 	snapshot.Devices = hydrated.devices
 	snapshot.Folders = hydrated.folders
+	snapshot.PendingFolders = hydrated.pendingFolders
+	snapshot.WebUI = hydrated.webUI
+	snapshot.Counts = normalizedCounts(hydrated.devices, hydrated.folders)
 	snapshot.Connection.Phase = "ready"
 	snapshot.Connection.Online = true
 	snapshot.Connection.Fresh = true
 	snapshot.Connection.Error = nil
 	snapshot.Lifecycle = s.probeLifecycle(ctx, true)
+	s.externalLatched = snapshot.Lifecycle.Classification == "external"
 	return snapshot, nil
 }
 
@@ -183,10 +211,26 @@ func (s *Session) loadAuthenticated(
 	if err != nil {
 		return hydratedState{}, err
 	}
+	pending, err := s.client.PendingFolders(ctx)
+	if err != nil {
+		return hydratedState{}, err
+	}
+	gui, err := s.client.GUIConfig(ctx)
+	if err != nil {
+		return hydratedState{}, err
+	}
+	paths, err := s.client.SystemPaths(ctx)
+	if err != nil {
+		return hydratedState{}, err
+	}
 	return hydratedState{
-		identity: Identity{DeviceID: bounded(status.MyID), Version: bounded(version.Version)},
-		devices:  normalizeDevices(devices, connections),
-		folders:  normalizedFolders,
+		identity: Identity{DeviceID: boundedIdentifier(status.MyID),
+			Version: boundedLabel(version.Version)},
+		devices:        normalizeDevices(devices, connections, status.MyID),
+		folders:        normalizedFolders,
+		pendingFolders: normalizePendingFolders(pending),
+		webUI: WebUI{URL: webURL(s.client.Endpoint()), Theme: boundedIdentifier(gui.Theme),
+			GUIAssets: boundedPath(paths.GUIAssets)},
 	}, nil
 }
 
@@ -197,7 +241,11 @@ func (s *Session) loadFolders(ctx context.Context, folders []syncthing.Folder) (
 		if err != nil {
 			return nil, err
 		}
-		result = append(result, normalizeFolder(folder, status))
+		errorsResponse, err := s.client.FolderErrors(ctx, folder.ID)
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, normalizeFolder(folder, status, errorsResponse))
 	}
 	sort.Slice(result, func(i, j int) bool { return result[i].ID < result[j].ID })
 	return result, nil
@@ -206,8 +254,18 @@ func (s *Session) loadFolders(ctx context.Context, folders []syncthing.Folder) (
 func (s *Session) failedHydration(ctx context.Context, snapshot Snapshot, err error) (Snapshot, error) {
 	snapshot.Connection.Phase = "error"
 	snapshot.Connection.Error = publicError(err)
-	snapshot.Lifecycle = s.probeLifecycle(ctx, false)
+	snapshot.Lifecycle = s.failureLifecycle(ctx)
 	return snapshot, err
+}
+
+func (s *Session) failureLifecycle(ctx context.Context) systemduser.State {
+	state := s.probeLifecycle(ctx, false)
+	if s.externalLatched {
+		state.Classification = "external"
+		state.CanControl = false
+		state.CanStart = false
+	}
+	return state
 }
 
 func (s *Session) probeLifecycle(ctx context.Context, apiOnline bool) systemduser.State {
@@ -246,6 +304,10 @@ func (s *Session) Configure(config OperationalConfig) ActionResult {
 	}
 	desired := s.desiredServiceState
 	s.configMu.Unlock()
+	select {
+	case s.configChanged <- struct{}{}:
+	default:
+	}
 	s.publishDesiredState(desired)
 	return ActionResult{OK: true, Revision: s.Current().Revision}
 }
@@ -278,93 +340,7 @@ func (s *Session) publishDesiredState(desired string) {
 	s.current.Revision++
 }
 
-// Rescan serializes and validates the phase-02 mutation path.
+// Rescan retains the focused phase-02 call surface.
 func (s *Session) Rescan(ctx context.Context, folderID string) ActionResult {
-	s.actionMu.Lock()
-	defer s.actionMu.Unlock()
-
-	folderID = strings.TrimSpace(folderID)
-	current := s.Current()
-	if !current.State.Connection.Online {
-		return rejected("offline", "Syncthing is not online")
-	}
-	var selected *Folder
-	for index := range current.State.Folders {
-		if current.State.Folders[index].ID == folderID {
-			selected = &current.State.Folders[index]
-			break
-		}
-	}
-	if selected == nil {
-		return rejected("folder_missing", "folder is no longer configured")
-	}
-	if selected.Paused {
-		return rejected("folder_paused", "paused folders cannot be rescanned")
-	}
-	if err := s.client.Rescan(ctx, folderID); err != nil {
-		return ActionResult{Error: publicError(err)}
-	}
-	refreshed, err := s.Refresh(ctx)
-	if err != nil {
-		return ActionResult{Error: publicError(err), Revision: refreshed.Revision}
-	}
-	return ActionResult{OK: true, Revision: refreshed.Revision}
-}
-
-func normalizeDevices(wire []syncthing.Device, connections syncthing.Connections) []Device {
-	limit := min(len(wire), maxDevices)
-	result := make([]Device, 0, limit)
-	for _, device := range wire[:limit] {
-		connection := connections.Connections[device.DeviceID]
-		result = append(result, Device{ID: bounded(device.DeviceID), Name: bounded(device.Name),
-			Untrusted: device.Untrusted, Connected: connection.Connected})
-	}
-	sort.Slice(result, func(i, j int) bool { return result[i].ID < result[j].ID })
-	return result
-}
-
-func normalizeFolder(folder syncthing.Folder, status syncthing.FolderStatus) Folder {
-	devices := make([]FolderDevice, 0, min(len(folder.Devices), maxDevices))
-	for _, device := range folder.Devices[:min(len(folder.Devices), maxDevices)] {
-		devices = append(devices, FolderDevice{ID: bounded(device.DeviceID)})
-	}
-	return Folder{
-		ID: bounded(folder.ID), Label: bounded(folder.Label), Path: bounded(folder.Path),
-		Paused: folder.Paused, MarkerName: bounded(folder.MarkerName), Devices: devices,
-		Status: FolderStatus{State: bounded(status.State), Error: bounded(status.Error),
-			PullErrors: status.PullErrors, NeedTotalItems: status.NeedTotalItems,
-			NeedBytes: status.NeedBytes, GlobalFiles: status.GlobalFiles,
-			GlobalBytes: status.GlobalBytes},
-	}
-}
-
-func publicError(err error) *Error {
-	var target *syncthing.Error
-	if errors.As(err, &target) {
-		return &Error{Code: string(target.Code), Message: bounded(target.Error())}
-	}
-	return &Error{Code: "internal", Message: "Syncshell core request failed"}
-}
-
-func rejected(code, message string) ActionResult {
-	return ActionResult{Error: &Error{Code: code, Message: message}}
-}
-
-func bounded(value string) string {
-	value = strings.TrimSpace(value)
-	if len(value) <= maxPublicString {
-		return value
-	}
-	return value[:maxPublicString]
-}
-
-func clonePublished(source PublishedSnapshot) PublishedSnapshot {
-	copy := source
-	copy.State.Devices = append([]Device(nil), source.State.Devices...)
-	copy.State.Folders = append([]Folder(nil), source.State.Folders...)
-	for index := range copy.State.Folders {
-		copy.State.Folders[index].Devices = append([]FolderDevice(nil), source.State.Folders[index].Devices...)
-	}
-	copy.State.Capabilities = append([]string(nil), source.State.Capabilities...)
-	return copy
+	return s.Act(ctx, "folder.rescan", ActionArguments{FolderID: folderID}, "", nil)
 }

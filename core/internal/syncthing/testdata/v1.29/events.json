@@ -1,0 +1,13 @@
+[
+  {
+    "id": 40,
+    "type": "RemoteDownloadProgress",
+    "data": {
+      "folder": "folder",
+      "device": "REMOTE",
+      "state": {
+        "archive.bin": 12
+      }
+    }
+  }
+]

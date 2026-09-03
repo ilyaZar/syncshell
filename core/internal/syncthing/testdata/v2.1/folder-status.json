@@ -1,0 +1,10 @@
+{
+  "state": "idle",
+  "error": "",
+  "pullErrors": 0,
+  "needTotalItems": 0,
+  "needBytes": 0,
+  "globalFiles": 12,
+  "globalBytes": 16384,
+  "sequence": 42
+}

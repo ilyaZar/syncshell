@@ -60,14 +60,18 @@ guest afterward.
 
 ## Native core development
 
-The phase-02 core and standalone harness are deliberately outside the
-production Omarchy entry points. Run their complete local checks with:
+The native core and standalone harness remain deliberately outside the
+production Omarchy entry points until the phase-04 cutover. Run their complete
+local checks with:
 
 ```bash
 go -C core test ./...
 go -C core test -race ./...
 go -C core vet ./...
+go -C core test -run='^$' -fuzz=FuzzEventJSON -fuzztime=1s \
+  ./internal/syncthing
 tests/core-process.test.sh
+tests/standalone-service.test.sh
 tests/native-core-architecture.test.sh
 tests/native-core-live.test.sh
 ```
@@ -88,3 +92,8 @@ SYNCSHELL_CONFIG_PATH=/path/to/isolated/config.xml \
 
 Never point the harness at the owner's normal Syncthing configuration. The
 standalone surface is a maintained contract test, not a supported 0.1.8 host.
+
+The interactive VM parity gate runs `tests/native-core-parity-vm.test.sh`
+against an explicitly supplied temporary core binary. It creates two isolated
+loopback-only Syncthing nodes and records only credential-free results under the
+VM artifact directory.

@@ -39,6 +39,26 @@ mutation, Web UI, lifecycle, executable, and capability facts. It never
 contains Omarchy labels, layout, settings paths, icon style, Web UI theme
 preference, package-manager state, or other presentation policy.
 
+The complete state object contains these sections:
+
+- `hostId`: the bounded adapter identity supplied at startup
+- `connection`: endpoint, health, authorization, online, and freshness
+- `identity`: authenticated device ID and Syncthing version
+- `devices`: bounded configured devices and connection state
+- `folders`: bounded configuration, status, sharing, and current errors
+- `pendingFolders`: bounded current offers and encryption flags
+- `activity`: bounded active files and the session-owned rotating current file
+- `webUi`: openable URL, selected theme, and GUI-assets path
+- `installation`: host-neutral executable presence and path
+- `mutation`: the one serialized action's busy, error, and result state
+- `counts`: normalized folder, device, connection, problem, and syncing totals
+- `lifecycle`: exact binding, observation, classification, and capabilities
+- `capabilities`: the action names implemented by this core
+
+Every collection and remote string is bounded so the complete snapshot remains
+within the transport line limit. A fresh snapshot replaces the prior state; no
+section is a patch or independently revisioned cache.
+
 Every accepted request has a non-empty caller-generated string `id` and exactly
 one result:
 
@@ -46,7 +66,7 @@ one result:
 {"v":1,"type":"refresh","id":"7"}
 {"v":1,"type":"configure","id":"8","config":{}}
 {"v":1,"type":"action","id":"9","action":"folder.rescan","args":{}}
-{"v":1,"type":"result","id":"9","ok":true,"revision":2}
+{"v":1,"type":"result","id":"9","ok":true,"revision":2,"data":{}}
 ```
 
 A failed result has a stable machine code and sanitized text:
@@ -55,9 +75,9 @@ A failed result has a stable machine code and sanitized text:
 {"v":1,"type":"result","id":"9","ok":false,"error":{"code":"folder_missing","message":"folder is no longer configured"}}
 ```
 
-The one `configure` request may update validated host-neutral timing and
-lifecycle intent. It cannot carry credentials, settings paths, style values,
-or arbitrary host objects.
+The one `configure` request may update `probeIntervalSeconds` and
+`desiredServiceState`. Both are validated and applied in memory. It cannot
+carry credentials, settings paths, style values, or arbitrary host objects.
 
 The domain action names are:
 
@@ -75,6 +95,19 @@ The domain action names are:
 - `webui.set-theme`
 
 Unsupported names fail; they do not fall back or alias another action.
+
+Action arguments are exact:
+
+- `folder.pause`, `folder.resume`, `folder.rescan`, and `folder.forget` take
+  `folderId`.
+- `folder.rescan-all`, `folder.suggest-id`, and lifecycle actions take an empty
+  object.
+- `folder.add-existing` takes `folderId`, `path`, optional `label`, bounded
+  `deviceIds`, and optional `pendingDeviceId`.
+- `webui.set-theme` takes `theme`.
+
+Successful folder-ID suggestion and add results return the resulting
+`folderId` in `data`. Irrelevant fields are rejected rather than ignored.
 
 ## Termination and protocol failure
 

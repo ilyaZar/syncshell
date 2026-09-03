@@ -76,6 +76,21 @@ func TestTrustedActiveBindingIsManaged(t *testing.T) {
 	}
 }
 
+func TestExternalClassificationSurvivesTransientAPILoss(t *testing.T) {
+	api := &testAPI{}
+	coreSession := newTestSession(t, api, "inactive", "LOCAL-ID")
+	initial, err := coreSession.Refresh(context.Background())
+	if err != nil || initial.State.Lifecycle.Classification != "external" {
+		t.Fatalf("external initialization failed: %#v %v", initial, err)
+	}
+	api.unauthorized.Store(true)
+	lost, err := coreSession.Refresh(context.Background())
+	if err == nil || lost.State.Lifecycle.Classification != "external" ||
+		lost.State.Lifecycle.CanControl || lost.State.Lifecycle.CanStart {
+		t.Fatalf("API loss exposed lifecycle controls: %#v %v", lost, err)
+	}
+}
+
 func TestExpectedIdentityMismatchRemovesAuthority(t *testing.T) {
 	coreSession := newTestSession(t, &testAPI{}, "active", "OTHER-ID")
 	published, err := coreSession.Refresh(context.Background())
@@ -165,6 +180,34 @@ func TestConfigureValidatesHostNeutralValues(t *testing.T) {
 	}
 }
 
+func TestConfigureSupportsConcurrentUpdates(t *testing.T) {
+	coreSession := newTestSession(t, &testAPI{}, "inactive", "LOCAL-ID")
+	if _, err := coreSession.Refresh(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	var wait sync.WaitGroup
+	for index := 0; index < 32; index++ {
+		wait.Add(1)
+		go func(index int) {
+			defer wait.Done()
+			seconds := index%10 + 1
+			state := "enabled"
+			if index%2 == 0 {
+				state = "disabled"
+			}
+			if result := coreSession.Configure(OperationalConfig{
+				ProbeIntervalSeconds: &seconds, DesiredServiceState: &state}); !result.OK {
+				t.Errorf("configure failed: %#v", result)
+			}
+		}(index)
+	}
+	wait.Wait()
+	interval := coreSession.ProbeInterval()
+	if interval < time.Second || interval > 10*time.Second {
+		t.Fatalf("invalid final interval: %v", interval)
+	}
+}
+
 func newTestSession(t *testing.T, api *testAPI, active, expectedID string) *Session {
 	t.Helper()
 	server := httptest.NewServer(api)
@@ -215,11 +258,22 @@ func (a *testAPI) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
 	case "/rest/config/folders":
 		writeSessionJSON(writer,
 			`[{"id":"folder","label":"Folder","path":"/tmp/folder","paused":false,"devices":[{"deviceID":"REMOTE"}]}]`)
+	case "/rest/config/folders/folder":
+		writeSessionJSON(writer,
+			`{"id":"folder","label":"Folder","path":"/tmp/folder","paused":false,"devices":[{"deviceID":"REMOTE"}]}`)
 	case "/rest/system/connections":
 		writeSessionJSON(writer, `{"connections":{"REMOTE":{"connected":true}}}`)
 	case "/rest/db/status":
 		writeSessionJSON(writer, fmt.Sprintf(
 			`{"state":"idle","globalFiles":%d,"globalBytes":9}`, a.globalFiles.Load()))
+	case "/rest/folder/errors":
+		writeSessionJSON(writer, `{"errors":[]}`)
+	case "/rest/cluster/pending/folders":
+		writeSessionJSON(writer, `{}`)
+	case "/rest/config/gui":
+		writeSessionJSON(writer, `{"theme":"default"}`)
+	case "/rest/system/paths":
+		writeSessionJSON(writer, `{"guiAssets":"/tmp/gui","baseDir-userHome":"/tmp"}`)
 	case "/rest/db/scan":
 		current := a.inFlight.Add(1)
 		for {

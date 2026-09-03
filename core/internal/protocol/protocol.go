@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"io"
 	"strings"
-	"time"
 
 	"github.com/omarchy-QOL/syncshell/core/internal/session"
 )
@@ -54,6 +53,7 @@ type Result struct {
 	ID       string         `json:"id"`
 	OK       bool           `json:"ok"`
 	Revision uint64         `json:"revision,omitempty"`
+	Data     any            `json:"data,omitempty"`
 	Error    *session.Error `json:"error,omitempty"`
 }
 
@@ -107,28 +107,31 @@ func (s Stream) Run(ctx context.Context) error {
 	if err := writeSnapshot(s.Output, initial); err != nil {
 		return err
 	}
+	lastRevision := initial.Revision
 
+	streamContext, cancel := context.WithCancel(ctx)
+	defer cancel()
 	inputs := make(chan input, 1)
-	readContext, cancelRead := context.WithCancel(ctx)
-	defer cancelRead()
-	go readLines(readContext, s.Input, inputs)
+	go readLines(streamContext, s.Input, inputs)
 
-	timer := time.NewTimer(s.Session.ProbeInterval())
-	defer timer.Stop()
+	updates := s.Session.Updates(streamContext)
 	seen := make(map[string]struct{})
 	for {
 		select {
 		case <-ctx.Done():
 			return writeFrame(s.Output, End{V: Version, Type: "end", Reason: "canceled"})
-		case <-timer.C:
-			before := s.Session.Current().Revision
-			published, _ := s.Session.Refresh(ctx)
-			if published.Revision != before {
-				if err := writeSnapshot(s.Output, published); err != nil {
-					return err
-				}
+		case published, ok := <-updates:
+			if !ok {
+				updates = nil
+				continue
 			}
-			resetTimer(timer, s.Session.ProbeInterval())
+			if published.Revision <= lastRevision {
+				continue
+			}
+			if err := writeSnapshot(s.Output, published); err != nil {
+				return err
+			}
+			lastRevision = published.Revision
 		case incoming, ok := <-inputs:
 			if !ok {
 				return writeFrame(s.Output, End{V: Version, Type: "end", Reason: "stdin"})
@@ -142,7 +145,7 @@ func (s Stream) Run(ctx context.Context) error {
 					Message: "protocol input is invalid"})
 				return incoming.err
 			}
-			shutdown, err := s.handleRequest(ctx, incoming.line, seen)
+			shutdown, err := s.handleRequest(ctx, incoming.line, seen, &lastRevision)
 			if err != nil {
 				_ = writeFrame(s.Output, Fatal{V: Version, Type: "fatal",
 					Code: "protocol_request", Message: err.Error()})
@@ -151,23 +154,27 @@ func (s Stream) Run(ctx context.Context) error {
 			if shutdown {
 				return writeFrame(s.Output, End{V: Version, Type: "end", Reason: "shutdown"})
 			}
-			resetTimer(timer, s.Session.ProbeInterval())
 		}
 	}
 }
 
-func (s Stream) handleRequest(ctx context.Context, line []byte, seen map[string]struct{}) (bool, error) {
+func (s Stream) handleRequest(
+	ctx context.Context,
+	line []byte,
+	seen map[string]struct{},
+	lastRevision *uint64,
+) (bool, error) {
 	request, err := validateRequest(line, seen)
 	if err != nil {
 		return false, err
 	}
 	switch request.Type {
 	case "configure":
-		return false, s.handleConfigure(request)
+		return false, s.handleConfigure(request, lastRevision)
 	case "refresh":
-		return false, s.handleRefresh(ctx, request.ID)
+		return false, s.handleRefresh(ctx, request.ID, lastRevision)
 	case "action":
-		return false, s.handleAction(ctx, request)
+		return false, s.handleAction(ctx, request, lastRevision)
 	case "shutdown":
 		if err := s.writeResult(request.ID,
 			session.ActionResult{OK: true, Revision: s.Session.Current().Revision}); err != nil {
@@ -201,7 +208,7 @@ func validateRequest(line []byte, seen map[string]struct{}) (request, error) {
 	return decoded, nil
 }
 
-func (s Stream) handleConfigure(request request) error {
+func (s Stream) handleConfigure(request request, lastRevision *uint64) error {
 	var config session.OperationalConfig
 	if len(request.Config) == 0 || !rawObject(request.Config) ||
 		decodeStrict(request.Config, &config) != nil {
@@ -212,21 +219,23 @@ func (s Stream) handleConfigure(request request) error {
 	before := s.Session.Current().Revision
 	result := s.Session.Configure(config)
 	after := s.Session.Current()
-	if after.Revision != before {
+	if after.Revision != before && after.Revision > *lastRevision {
 		if err := writeSnapshot(s.Output, after); err != nil {
 			return err
 		}
+		*lastRevision = after.Revision
 	}
 	return s.writeResult(request.ID, result)
 }
 
-func (s Stream) handleRefresh(ctx context.Context, id string) error {
+func (s Stream) handleRefresh(ctx context.Context, id string, lastRevision *uint64) error {
 	before := s.Session.Current().Revision
 	published, refreshErr := s.Session.Refresh(ctx)
-	if published.Revision != before {
+	if published.Revision != before && published.Revision > *lastRevision {
 		if err := writeSnapshot(s.Output, published); err != nil {
 			return err
 		}
+		*lastRevision = published.Revision
 	}
 	result := session.ActionResult{OK: refreshErr == nil, Revision: published.Revision}
 	if refreshErr != nil {
@@ -235,34 +244,37 @@ func (s Stream) handleRefresh(ctx context.Context, id string) error {
 	return s.writeResult(id, result)
 }
 
-func (s Stream) handleAction(ctx context.Context, request request) error {
-	if request.Action != "folder.rescan" {
-		return s.writeResult(request.ID,
-			session.ActionResult{Error: &session.Error{Code: "unsupported_action",
-				Message: "action is not supported"}})
-	}
-	var arguments struct {
-		FolderID string `json:"folderId"`
-	}
+func (s Stream) handleAction(
+	ctx context.Context,
+	request request,
+	lastRevision *uint64,
+) error {
+	var arguments session.ActionArguments
 	if !rawObject(request.Args) || decodeStrict(request.Args, &arguments) != nil {
 		return s.writeResult(request.ID,
 			session.ActionResult{Error: &session.Error{Code: "invalid_action",
 				Message: "action arguments are invalid"}})
 	}
-	before := s.Session.Current().Revision
-	result := s.Session.Rescan(ctx, arguments.FolderID)
-	after := s.Session.Current()
-	if after.Revision != before {
-		if err := writeSnapshot(s.Output, after); err != nil {
-			return err
-		}
+	var writeErr error
+	result := s.Session.Act(ctx, request.Action, arguments, request.ID,
+		func(published session.PublishedSnapshot) {
+			if writeErr == nil && published.Revision > *lastRevision {
+				writeErr = writeSnapshot(s.Output, published)
+				if writeErr == nil {
+					*lastRevision = published.Revision
+				}
+			}
+		})
+	if writeErr != nil {
+		return writeErr
 	}
 	return s.writeResult(request.ID, result)
 }
 
 func (s Stream) writeResult(id string, result session.ActionResult) error {
 	return writeFrame(s.Output, Result{V: Version, Type: "result", ID: id,
-		OK: result.OK, Revision: result.Revision, Error: result.Error})
+		OK: result.OK, Revision: result.Revision, Data: result.Data,
+		Error: result.Error})
 }
 
 func readLines(ctx context.Context, reader io.Reader, output chan<- input) {
@@ -331,14 +343,4 @@ func decodeStrict(data []byte, destination any) error {
 func rawObject(value json.RawMessage) bool {
 	trimmed := bytes.TrimSpace(value)
 	return len(trimmed) >= 2 && trimmed[0] == '{' && trimmed[len(trimmed)-1] == '}'
-}
-
-func resetTimer(timer *time.Timer, duration time.Duration) {
-	if !timer.Stop() {
-		select {
-		case <-timer.C:
-		default:
-		}
-	}
-	timer.Reset(duration)
 }

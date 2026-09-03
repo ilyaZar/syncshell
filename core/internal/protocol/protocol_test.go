@@ -13,6 +13,7 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/omarchy-QOL/syncshell/core/internal/session"
 	"github.com/omarchy-QOL/syncshell/core/internal/syncthing"
@@ -42,7 +43,8 @@ func TestStreamConfigureRefreshAndRescan(t *testing.T) {
 		`{"v":1,"type":"configure","id":"1","config":{"probeIntervalSeconds":2}}` + "\n" +
 			`{"v":1,"type":"refresh","id":"2"}` + "\n" +
 			`{"v":1,"type":"action","id":"3","action":"folder.rescan","args":{"folderId":"folder"}}` + "\n" +
-			`{"v":1,"type":"shutdown","id":"4"}` + "\n")
+			`{"v":1,"type":"action","id":"4","action":"folder.suggest-id","args":{}}` + "\n" +
+			`{"v":1,"type":"shutdown","id":"5"}` + "\n")
 	var output bytes.Buffer
 	err := (Stream{Session: coreSession, Input: input, Output: &output,
 		Build: Build{Version: "0.1.8", Protocol: Version}}).Run(context.Background())
@@ -62,10 +64,14 @@ func TestStreamConfigureRefreshAndRescan(t *testing.T) {
 			results[frame["id"].(string)] = frame
 		}
 	}
-	for _, id := range []string{"1", "2", "3", "4"} {
+	for _, id := range []string{"1", "2", "3", "4", "5"} {
 		if results[id] == nil || results[id]["ok"] != true {
 			t.Fatalf("missing successful result %s: %#v", id, results)
 		}
+	}
+	data, _ := results["4"]["data"].(map[string]any)
+	if data["folderId"] != "abcdefghij" {
+		t.Fatalf("suggestion data missing: %#v", results["4"])
 	}
 }
 
@@ -147,6 +153,78 @@ func TestStreamStdoutIsJSONAndSecretFree(t *testing.T) {
 	}
 }
 
+func TestBoundedPublicSnapshotFitsOneFrame(t *testing.T) {
+	state := session.Snapshot{
+		Connection: session.Connection{Endpoint: strings.Repeat("e", 4096)},
+		Identity: session.Identity{DeviceID: strings.Repeat("i", 256),
+			Version: strings.Repeat("v", 512)},
+		PendingFolders: make(map[string]session.PendingFolder),
+	}
+	for index := 0; index < 64; index++ {
+		state.Devices = append(state.Devices, session.Device{
+			ID: strings.Repeat("d", 256), Name: strings.Repeat("n", 512),
+		})
+	}
+	for index := 0; index < 24; index++ {
+		folder := session.Folder{ID: strings.Repeat("f", 256),
+			Label: strings.Repeat("l", 512), Path: strings.Repeat("p", 4096),
+			Status: session.FolderStatus{State: "idle"}}
+		for range 16 {
+			folder.Devices = append(folder.Devices,
+				session.FolderDevice{ID: strings.Repeat("d", 256)})
+		}
+		for range 4 {
+			folder.Status.Errors = append(folder.Status.Errors, session.FolderError{
+				Path: strings.Repeat("p", 512), Error: strings.Repeat("e", 1024),
+			})
+		}
+		state.Folders = append(state.Folders, folder)
+	}
+	for index := 0; index < 12; index++ {
+		offers := make(map[string]session.FolderOffer)
+		for offer := 0; offer < 8; offer++ {
+			offers[fmt.Sprintf("device-%d", offer)] = session.FolderOffer{
+				Label: strings.Repeat("l", 512),
+			}
+		}
+		state.PendingFolders[fmt.Sprintf("folder-%d", index)] =
+			session.PendingFolder{OfferedBy: offers}
+	}
+	for range 12 {
+		state.Activity.Files = append(state.Activity.Files, session.Activity{
+			FolderID: strings.Repeat("f", 256), Path: strings.Repeat("p", 4096),
+			Detail: strings.Repeat("d", 512), Action: "syncing",
+		})
+	}
+	var output bytes.Buffer
+	err := WritePublished(&output, session.PublishedSnapshot{Revision: 1, State: state})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if output.Len() > MaxLineBytes {
+		t.Fatalf("snapshot frame is %d bytes", output.Len())
+	}
+}
+
+func TestStreamSupportsSlowStdoutConsumer(t *testing.T) {
+	coreSession, _ := newProtocolSession(t, false)
+	writer := &slowWriter{}
+	if err := (Stream{Session: coreSession, Input: strings.NewReader(""),
+		Output: writer, Build: Build{Version: "0.1.8", Protocol: Version}}).
+		Run(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	frames := decodeFrames(t, writer.Bytes())
+	assertTypes(t, frames, "hello", "snapshot", "end")
+}
+
+type slowWriter struct{ bytes.Buffer }
+
+func (w *slowWriter) Write(contents []byte) (int, error) {
+	time.Sleep(time.Millisecond)
+	return w.Buffer.Write(contents)
+}
+
 func FuzzRequestDecoder(f *testing.F) {
 	f.Add([]byte(`{"v":1,"type":"refresh","id":"1"}`))
 	f.Add([]byte(`{`))
@@ -176,10 +254,23 @@ func newProtocolSession(t *testing.T, unauthorized bool) (*session.Session, *ato
 		case "/rest/config/folders":
 			protocolJSON(writer,
 				`[{"id":"folder","label":"Folder","path":"/tmp/folder","paused":false}]`)
+		case "/rest/config/folders/folder":
+			protocolJSON(writer,
+				`{"id":"folder","label":"Folder","path":"/tmp/folder","paused":false}`)
 		case "/rest/system/connections":
 			protocolJSON(writer, `{"connections":{}}`)
 		case "/rest/db/status":
 			protocolJSON(writer, `{"state":"idle"}`)
+		case "/rest/folder/errors":
+			protocolJSON(writer, `{"errors":[]}`)
+		case "/rest/cluster/pending/folders":
+			protocolJSON(writer, `{}`)
+		case "/rest/config/gui":
+			protocolJSON(writer, `{"theme":"default"}`)
+		case "/rest/system/paths":
+			protocolJSON(writer, `{"guiAssets":"/tmp/gui","baseDir-userHome":"/tmp"}`)
+		case "/rest/svc/random/string":
+			protocolJSON(writer, `{"random":"ABCDEFGHIJ"}`)
 		case "/rest/db/scan":
 			rescans.Add(1)
 			writer.WriteHeader(http.StatusOK)

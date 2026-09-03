@@ -12,6 +12,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"sync/atomic"
@@ -220,6 +221,29 @@ func TestClientUnixSocket(t *testing.T) {
 	status, err := client.Status(context.Background())
 	if err != nil || status.MyID != "UNIX-ID" {
 		t.Fatalf("unexpected Unix status: %#v %v", status, err)
+	}
+}
+
+func TestClientEventsUsesBoundedFilteredCursor(t *testing.T) {
+	var query url.Values
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		query = request.URL.Query()
+		if request.Header.Get("X-API-Key") != testAPIKey {
+			http.Error(writer, "unauthorized", http.StatusUnauthorized)
+			return
+		}
+		writeJSON(writer, `[{"id":7,"type":"ConfigSaved","data":{}}]`)
+	}))
+	defer server.Close()
+	client := testClient(t, server.URL, "", false)
+	events, err := client.Events(context.Background(), 6, 32, 1,
+		[]string{"ConfigSaved", "FolderSummary"})
+	if err != nil || len(events) != 1 || events[0].ID != 7 {
+		t.Fatalf("unexpected events: %#v %v", events, err)
+	}
+	if query.Get("since") != "6" || query.Get("limit") != "32" ||
+		query.Get("timeout") != "1" || query.Get("events") != "ConfigSaved,FolderSummary" {
+		t.Fatalf("unexpected event query: %v", query)
 	}
 }
 

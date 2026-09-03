@@ -281,6 +281,25 @@ func regularFile(path string) bool {
 	return err == nil && info.Mode().IsRegular()
 }
 
+// FindExecutable returns the selected or PATH-discovered Syncthing binary.
+func FindExecutable(selected string) string {
+	if selected != "" {
+		if path, err := filepath.Abs(selected); err == nil && regularFile(path) {
+			return path
+		}
+		return ""
+	}
+	path, err := exec.LookPath("syncthing")
+	if err != nil {
+		return ""
+	}
+	absolute, err := filepath.Abs(path)
+	if err != nil {
+		return filepath.Clean(path)
+	}
+	return absolute
+}
+
 func syncthingConfigPath(ctx context.Context, options DiscoveryOptions) (string, error) {
 	binary := options.SyncthingBinary
 	if binary == "" {

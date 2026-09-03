@@ -26,7 +26,7 @@ QtObject {
     ? String(snapshot.identity.deviceId || "") : ""
   readonly property var folders: snapshot.folders || []
 
-  signal actionFinished(string id, bool ok, var error)
+  signal actionFinished(string id, bool ok, var data, var error)
 
   function startupArguments() {
     var args = ["--host-id", "standalone",
@@ -57,6 +57,34 @@ QtObject {
     return core.action("folder.rescan", { folderId: folderId })
   }
 
+  function pause(folderId) {
+    return core.action("folder.pause", { folderId: folderId })
+  }
+
+  function resume(folderId) {
+    return core.action("folder.resume", { folderId: folderId })
+  }
+
+  function rescanAll() { return core.action("folder.rescan-all", {}) }
+
+  function forget(folderId) {
+    return core.action("folder.forget", { folderId: folderId })
+  }
+
+  function addExisting(arguments) {
+    return core.action("folder.add-existing", arguments || ({}))
+  }
+
+  function suggestFolderId() { return core.action("folder.suggest-id", {}) }
+
+  function lifecycle(action) {
+    return core.action("lifecycle." + action, {})
+  }
+
+  function setWebUiTheme(theme) {
+    return core.action("webui.set-theme", { theme: theme })
+  }
+
   function restart() { return core.restart() }
 
   function stop() { core.terminate() }
@@ -64,8 +92,8 @@ QtObject {
   property CoreProcess core: CoreProcess {
     corePath: root.corePath
     startupArguments: root.startupArguments()
-    onResultReceived: function(id, ok, revision, error) {
-      root.actionFinished(id, ok, error)
+    onResultReceived: function(id, ok, revision, data, error) {
+      root.actionFinished(id, ok, data, error)
     }
   }
 }

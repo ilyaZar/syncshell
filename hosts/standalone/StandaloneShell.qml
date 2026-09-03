@@ -74,6 +74,18 @@ ShellRoot {
     function status(): string { return JSON.stringify(root.service.snapshot) }
     function refresh(): void { root.service.refresh() }
     function rescan(folderId: string): void { root.service.rescan(folderId) }
+    function pause(folderId: string): void { root.service.pause(folderId) }
+    function resume(folderId: string): void { root.service.resume(folderId) }
+    function rescanAll(): void { root.service.rescanAll() }
+    function forget(folderId: string): void { root.service.forget(folderId) }
+    function addExisting(argumentsJson: string): void {
+      root.service.addExisting(JSON.parse(argumentsJson))
+    }
+    function suggestFolderId(): void { root.service.suggestFolderId() }
+    function lifecycle(action: string): void { root.service.lifecycle(action) }
+    function setWebUiTheme(theme: string): void {
+      root.service.setWebUiTheme(theme)
+    }
     function restart(): void { root.service.restart() }
   }
 }

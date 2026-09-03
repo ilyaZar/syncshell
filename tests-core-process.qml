@@ -26,7 +26,7 @@ ShellRoot {
     Qt.exit(1)
   }
 
-  function requestCompleted(ok, revision, error) {
+  function requestCompleted(ok, revision, data, error) {
     if (!ok || error) {
       fail("mock request failed: " + JSON.stringify(error))
       return

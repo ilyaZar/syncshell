@@ -24,9 +24,10 @@ const maxResponseBytes = 8 << 20
 
 // Client owns authenticated transport to one selected Syncthing instance.
 type Client struct {
-	target Target
-	http   *http.Client
-	base   string
+	target    Target
+	http      *http.Client
+	eventHTTP *http.Client
+	base      string
 }
 
 // String returns only nonsecret client identity.
@@ -70,20 +71,24 @@ func NewClient(target Target) (*Client, error) {
 	if err != nil {
 		return nil, failure(ErrorConfig, "client", "Syncthing endpoint is invalid", err)
 	}
-	client := &http.Client{
-		Transport: transport,
-		Timeout:   15 * time.Second,
-		CheckRedirect: func(request *http.Request, via []*http.Request) error {
-			if request.URL.Scheme != origin.Scheme || request.URL.Host != origin.Host {
-				return errors.New("cross-origin redirect rejected")
-			}
-			if len(via) >= 3 {
-				return errors.New("redirect limit exceeded")
-			}
-			return nil
-		},
+	checkRedirect := func(request *http.Request, via []*http.Request) error {
+		if request.URL.Scheme != origin.Scheme || request.URL.Host != origin.Host {
+			return errors.New("cross-origin redirect rejected")
+		}
+		if len(via) >= 3 {
+			return errors.New("redirect limit exceeded")
+		}
+		return nil
 	}
-	return &Client{target: target, http: client, base: strings.TrimRight(base, "/")}, nil
+	client := &http.Client{
+		Transport:     transport,
+		Timeout:       15 * time.Second,
+		CheckRedirect: checkRedirect,
+	}
+	eventClient := &http.Client{Transport: transport, Timeout: 70 * time.Second,
+		CheckRedirect: checkRedirect}
+	return &Client{target: target, http: client, eventHTTP: eventClient,
+		base: strings.TrimRight(base, "/")}, nil
 }
 
 func targetTLSConfig(target Target) (*tls.Config, error) {
@@ -206,7 +211,10 @@ func (c *Client) FolderStatus(ctx context.Context, folderID string) (FolderStatu
 
 // Rescan requests one verified folder scan.
 func (c *Client) Rescan(ctx context.Context, folderID string) error {
-	path := "/rest/db/scan?folder=" + url.QueryEscape(folderID)
+	path := "/rest/db/scan"
+	if folderID != "" {
+		path += "?folder=" + url.QueryEscape(folderID)
+	}
 	return c.request(ctx, http.MethodPost, path, nil, true, nil)
 }
 
@@ -218,15 +226,31 @@ func (c *Client) request(
 	authenticated bool,
 	destination any,
 ) error {
+	return c.requestWith(c.http, ctx, method, path, body, authenticated, destination)
+}
+
+func (c *Client) requestWith(
+	httpClient *http.Client,
+	ctx context.Context,
+	method string,
+	path string,
+	body []byte,
+	authenticated bool,
+	destination any,
+	acceptedStatuses ...int,
+) error {
 	request, err := http.NewRequestWithContext(ctx, method, c.base+path, bytes.NewReader(body))
 	if err != nil {
 		return failure(ErrorConfig, "request", "could not create Syncthing request", err)
 	}
 	request.Header.Set("Accept", "application/json")
+	if body != nil {
+		request.Header.Set("Content-Type", "application/json")
+	}
 	if authenticated {
 		request.Header.Set("X-API-Key", c.target.apiKey)
 	}
-	response, err := c.http.Do(request)
+	response, err := httpClient.Do(request)
 	if err != nil {
 		if strings.Contains(strings.ToLower(err.Error()), "tls") ||
 			strings.Contains(strings.ToLower(err.Error()), "certificate") {
@@ -238,7 +262,17 @@ func (c *Client) request(
 	if response.StatusCode == http.StatusUnauthorized || response.StatusCode == http.StatusForbidden {
 		return failure(ErrorUnauthorized, "request", "Syncthing authorization failed", nil)
 	}
+	accepted := false
+	for _, status := range acceptedStatuses {
+		if response.StatusCode == status {
+			accepted = true
+			break
+		}
+	}
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
+		if accepted {
+			return nil
+		}
 		return failure(ErrorHTTP, "request",
 			fmt.Sprintf("Syncthing returned HTTP %d", response.StatusCode), nil)
 	}

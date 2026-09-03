@@ -52,6 +52,40 @@ type Controller struct {
 	Command string
 }
 
+// Action changes one exact authorized user unit.
+type Action string
+
+const (
+	ActionStart   Action = "start"
+	ActionStop    Action = "stop"
+	ActionEnable  Action = "enable"
+	ActionDisable Action = "disable"
+)
+
+// Apply invokes one validated lifecycle action for an already authorized unit.
+func (c Controller) Apply(ctx context.Context, unit string, action Action) error {
+	if !validUnit.MatchString(unit) {
+		return errors.New("lifecycle unit is invalid")
+	}
+	switch action {
+	case ActionStart, ActionStop, ActionEnable, ActionDisable:
+	default:
+		return errors.New("lifecycle action is invalid")
+	}
+	command := c.Command
+	if command == "" {
+		command = "systemctl"
+	}
+	actionContext, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	output, err := exec.CommandContext(actionContext, command,
+		"--user", string(action), unit).CombinedOutput()
+	if err != nil || len(output) > maxShowOutput {
+		return errors.New("authorized user-service action failed")
+	}
+	return nil
+}
+
 // Probe observes the exact authorized unit after API state is known.
 func (c Controller) Probe(
 	ctx context.Context,

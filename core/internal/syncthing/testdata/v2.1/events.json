@@ -1,0 +1,17 @@
+[
+  {
+    "id": 81,
+    "globalID": 85,
+    "type": "RemoteDownloadProgress",
+    "data": {
+      "folder": "folder",
+      "device": "REMOTE",
+      "state": {
+        "archive.bin": {
+          "bytesDone": 1024,
+          "bytesTotal": 4096
+        }
+      }
+    }
+  }
+]

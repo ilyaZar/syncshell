@@ -25,7 +25,7 @@ QtObject {
   property bool _expectedStop: false
   property bool _restartRequested: false
 
-  signal resultReceived(string id, bool ok, int revision, var error)
+  signal resultReceived(string id, bool ok, int revision, var data, var error)
   signal protocolFailed(string message)
 
   function start() {
@@ -163,9 +163,9 @@ QtObject {
     delete next[id]
     _pending = next
     if (callback) callback(message.ok === true, message.revision || 0,
-      message.error || null)
+      message.data || null, message.error || null)
     resultReceived(id, message.ok === true, message.revision || 0,
-      message.error || null)
+      message.data || null, message.error || null)
   }
 
   function utf8Length(value) {

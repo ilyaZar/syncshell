@@ -11,8 +11,8 @@ ShellRoot {
   property int handledGeneration: 0
   property bool versionFailurePassed: false
   property bool lineBoundPassed: false
-  readonly property string mockPath: localPath(
-    Qt.resolvedUrl("tests/core-process-mock.sh"))
+  readonly property string testPluginRoot:
+    Quickshell.env("SYNCSHELL_TEST_PLUGIN_ROOT") || ""
 
   function localPath(url) {
     var value = String(url || "")
@@ -61,7 +61,7 @@ ShellRoot {
 
   CoreProcess {
     id: core
-    corePath: root.mockPath
+    pluginRoot: root.testPluginRoot
 
     onRevisionChanged: root.handleSnapshot()
 
@@ -70,7 +70,7 @@ ShellRoot {
 
   CoreProcess {
     id: versionProbe
-    corePath: root.mockPath
+    pluginRoot: root.testPluginRoot
     desiredRunning: false
     onProtocolFailed: function(message) {
       root.versionFailurePassed = message.indexOf("protocol major") >= 0
@@ -79,7 +79,7 @@ ShellRoot {
 
   CoreProcess {
     id: lineBoundProbe
-    corePath: root.mockPath
+    pluginRoot: root.testPluginRoot
     desiredRunning: false
     onProtocolFailed: function(message) {
       root.lineBoundPassed = message.indexOf("line bound") >= 0

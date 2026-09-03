@@ -1,8 +1,7 @@
 # Syncshell ownership
 
-This is the final ownership map for the 0.1.8 architecture. Phase 01 records
-the destination without moving the released implementation. The atomic move
-and deletion occur only after native parity is proven.
+This is the final ownership map for the 0.1.8 architecture. The phase 04
+cutover moved the retained host implementation after native parity was proven.
 
 | Path                         | Sole responsibility                         |
 | ---------------------------- | ------------------------------------------- |
@@ -38,10 +37,9 @@ Omarchy entry points. They are boundaries, not additional owners.
 
 ## Transition
 
-Until the phase 04 cutover, the released root QML implementation remains the
-only production path in its original locations. At cutover, retained Omarchy
-presentation and settings files move directly to `hosts/omarchy/`; replaced
-REST, credential, event, state, folder, and lifecycle code is deleted from its
-original paths. There is no mixed runtime, fallback, alias, or feature flag.
+Retained Omarchy presentation and settings files live in `hosts/omarchy/`.
+Replaced REST, credential, event, state, folder, and lifecycle QML code was
+deleted from its original paths.
+There is no mixed runtime, fallback, alias, or feature flag.
 
 The future host directories are README-only in 0.1.8 and make no support claim.

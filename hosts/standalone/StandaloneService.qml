@@ -4,7 +4,7 @@ import "../../shared"
 QtObject {
   id: root
 
-  required property string corePath
+  required property string pluginRoot
   property string configPath: ""
   property string endpoint: ""
   property string credentialFile: ""
@@ -90,7 +90,7 @@ QtObject {
   function stop() { core.terminate() }
 
   property CoreProcess core: CoreProcess {
-    corePath: root.corePath
+    pluginRoot: root.pluginRoot
     startupArguments: root.startupArguments()
     onResultReceived: function(id, ok, revision, data, error) {
       root.actionFinished(id, ok, data, error)

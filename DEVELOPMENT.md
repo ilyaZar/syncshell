@@ -24,8 +24,8 @@ The target ownership and protocol are recorded in:
 - [Omarchy service contract](docs/omarchy-service-contract-0.1.7.md)
 - [Omarchy interaction contract](docs/omarchy-interaction-contract-0.1.7.md)
 
-The released QML engine stays in its original paths until the atomic cutover.
-Do not introduce a mixed QML and Go domain runtime.
+The production entry points delegate to the Omarchy host, which starts one
+bundled native core. Do not introduce a mixed QML and Go domain runtime.
 
 ## Baseline checks
 
@@ -35,16 +35,17 @@ Run the complete released suite from the repository root:
 git diff --check
 jq empty manifest.json
 omarchy plugin validate .
-qmllint Panel.qml Service.qml core/*.qml models/*.js ui/*.qml \
-  tests*.qml scripts/folder-picker.qml
-bash -n scripts/*.sh tests/*.sh
+qmllint -I /usr/share/omarchy/shell Panel.qml Service.qml \
+  shared/*.qml hosts/omarchy/*.qml hosts/omarchy/controllers/*.qml \
+  hosts/omarchy/ui/*.qml tests*.qml
+bash -n hosts/omarchy/scripts/*.sh packaging/bundled/*.sh tests/*.sh
 mise exec aqua:koalaman/shellcheck@0.11.0 -- \
-  shellcheck scripts/*.sh tests/*.sh
+  shellcheck hosts/omarchy/scripts/*.sh packaging/bundled/*.sh tests/*.sh
 qml6 --apptype core -f tests/run.qml
 bash tests/scripts.test.sh
 bash tests/architecture.test.sh
-bash tests/folder-rescan.test.sh
-bash tests/service-state.test.sh
+bash tests/native-core-architecture.test.sh
+bash tests/omarchy-service-contract.test.sh
 ```
 
 ## Isolated runtime tests
@@ -60,11 +61,13 @@ guest afterward.
 
 ## Native core development
 
-The native core and standalone harness remain deliberately outside the
-production Omarchy entry points until the phase-04 cutover. Run their complete
-local checks with:
+Build and verify the exact production artifact before running the native
+checks:
 
 ```bash
+packaging/bundled/build.sh
+git add bin/x86_64/syncshell-core
+packaging/bundled/verify.sh
 go -C core test ./...
 go -C core test -race ./...
 go -C core vet ./...
@@ -80,12 +83,12 @@ The live test creates one temporary Syncthing home and Unix GUI socket. It
 disables discovery, relays, NAT traversal, telemetry, and upgrades, then removes
 the complete temporary tree.
 
-To inspect the shell-neutral harness manually, build to a temporary path and
+To inspect the shell-neutral harness manually, reproduce the bundled core and
 provide an isolated Syncthing configuration:
 
 ```bash
-go -C core build -trimpath -o /tmp/syncshell-core ./cmd/syncshell-core
-SYNCSHELL_CORE_PATH=/tmp/syncshell-core \
+packaging/bundled/build.sh
+SYNCSHELL_PLUGIN_ROOT="$PWD" \
 SYNCSHELL_CONFIG_PATH=/path/to/isolated/config.xml \
   quickshell -p tests-standalone.qml
 ```

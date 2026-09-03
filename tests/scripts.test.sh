@@ -12,8 +12,8 @@ fail() {
 
 test_settings() {
   local target="$test_root/settings/config/settings.toml"
-  bash "$root/scripts/syncthing-settings.sh" ensure \
-    "$root/config/settings.toml" "$target" themed >/dev/null
+  bash "$root/hosts/omarchy/scripts/syncthing-settings.sh" ensure \
+    "$root/hosts/omarchy/config/settings.toml" "$target" themed >/dev/null
   grep -q '^version = 1$' "$target" \
     || fail "settings version was not seeded"
   grep -q '^\[style\]$' "$target" \
@@ -25,8 +25,9 @@ test_settings() {
   grep -Eq '^probe_interval_seconds[[:space:]]*=[[:space:]]*15$' "$target" \
     || fail "service probe interval was not seeded"
 
-  bash "$root/scripts/syncthing-settings.sh" set-service-state \
-    "$root/config/settings.toml" "$target" themed disabled >/dev/null
+  bash "$root/hosts/omarchy/scripts/syncthing-settings.sh" set-service-state \
+    "$root/hosts/omarchy/config/settings.toml" "$target" themed disabled \
+    >/dev/null
   grep -Eq '^service_state[[:space:]]*=[[:space:]]*"disabled"' "$target" \
     || fail "service state was not updated"
   [[ $(grep -c '^service_state[[:space:]]*=' "$target") == 1 ]] \
@@ -39,8 +40,9 @@ test_settings() {
     'icon_style = "branded"' \
     'web_ui_theme = "default"' \
     >"$legacy"
-  bash "$root/scripts/syncthing-settings.sh" set-service-state \
-    "$root/config/settings.toml" "$legacy" branded disabled >/dev/null
+  bash "$root/hosts/omarchy/scripts/syncthing-settings.sh" set-service-state \
+    "$root/hosts/omarchy/config/settings.toml" "$legacy" branded disabled \
+    >/dev/null
   grep -Fxq '[service]' "$legacy" \
     || fail "legacy settings did not receive a service section"
   grep -Eq '^service_state[[:space:]]*=[[:space:]]*"disabled"' "$legacy" \
@@ -58,8 +60,9 @@ test_settings() {
     'service_state = "disabled"' \
     >"$invalid"
   invalid_before=$(<"$invalid")
-  if bash "$root/scripts/syncthing-settings.sh" set-service-state \
-      "$root/config/settings.toml" "$invalid" branded enabled \
+  if bash "$root/hosts/omarchy/scripts/syncthing-settings.sh" \
+      set-service-state "$root/hosts/omarchy/config/settings.toml" \
+      "$invalid" branded enabled \
       >/dev/null 2>&1; then
     fail "invalid service settings update succeeded"
   fi
@@ -67,8 +70,8 @@ test_settings() {
     || fail "failed service settings update changed the file"
 
   printf '%s\n' '# user-owned' >"$target"
-  bash "$root/scripts/syncthing-settings.sh" ensure \
-    "$root/config/settings.toml" "$target" branded >/dev/null
+  bash "$root/hosts/omarchy/scripts/syncthing-settings.sh" ensure \
+    "$root/hosts/omarchy/config/settings.toml" "$target" branded >/dev/null
   [[ $(<"$target") == "# user-owned" ]] \
     || fail "existing settings were overwritten"
 }
@@ -94,13 +97,11 @@ test_installation_status() {
   output=$(HOME="$sandbox/home" \
     XDG_RUNTIME_DIR="$sandbox/runtime" \
     PATH="$fake_bin:$PATH" \
-    bash "$root/scripts/syncthing-install.sh" status)
+    bash "$root/hosts/omarchy/scripts/syncthing-install.sh" status)
   jq -e '
     .state == "existing"
-    and .serviceAvailable == true
-    and .serviceRunning == false
-    and .serviceActiveState == "inactive"
-    and .unitFileState == "disabled"
+    and .executable != ""
+    and (.operationRunning | type) == "boolean"
   ' <<<"$output" >/dev/null \
     || fail "installation status omitted systemd service state"
 }
@@ -119,7 +120,7 @@ test_themes() {
     while IFS= read -r colors; do
       theme=$(basename -- "$(dirname -- "$colors")")
       SYNCTHING_GUI_URL="file://$default_gui" \
-        bash "$root/scripts/syncthing-theme.sh" generate \
+        bash "$root/hosts/omarchy/scripts/syncthing-theme.sh" generate \
           "$test_root/themes/$theme" "$colors" >/dev/null
       grep -Fxq '@import "/theme-assets/default/assets/css/theme.css";' \
         "$test_root/themes/$theme/syncthing-omarchy/assets/css/theme.css" \
@@ -145,7 +146,7 @@ test_themes() {
     'color6 = "#89ddff"' \
     >"$user_theme"
   SYNCTHING_GUI_URL="file://$default_gui" \
-    bash "$root/scripts/syncthing-theme.sh" generate \
+    bash "$root/hosts/omarchy/scripts/syncthing-theme.sh" generate \
       "$test_root/themes/user" "$user_theme" >/dev/null
   grep -Fxq '@import "/theme-assets/default/assets/css/theme.css";' \
     "$test_root/themes/user/syncthing-omarchy/assets/css/theme.css" \
@@ -170,7 +171,7 @@ test_themes() {
   grep -Fq 'src="assets/js/omarchy_theme_refresh.js"' \
     "$user_root/index.html" \
     || fail "Web UI did not load the theme refresh helper"
-  cmp -s -- "$root/webui/omarchy_theme_refresh.js" \
+  cmp -s -- "$root/hosts/omarchy/webui/omarchy_theme_refresh.js" \
     "$user_root/assets/js/omarchy_theme_refresh.js" \
     || fail "generated theme refresh helper differs from its source"
   [[ -z $(find "$user_root" -maxdepth 1 -type f \
@@ -232,7 +233,7 @@ test_removal_mode() {
     XDG_RUNTIME_DIR="$sandbox/runtime" \
     FAKE_PLUGIN_TARGET="$installed" \
     PATH="$fake_bin:$PATH" \
-    bash "$root/scripts/syncthing-remove.sh" _worker \
+    bash "$root/hosts/omarchy/scripts/syncthing-remove.sh" _worker \
       "$source" "$gui_assets" "$mode"
 
   if [[ $install_kind == link ]]; then

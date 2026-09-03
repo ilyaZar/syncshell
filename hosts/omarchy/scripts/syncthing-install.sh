@@ -22,11 +22,6 @@ require_command() {
   command -v "$1" >/dev/null 2>&1 || fail "Required command not found: $1"
 }
 
-service_property() {
-  systemctl --user show "$service_name" --property="$1" --value \
-    2>/dev/null || true
-}
-
 operation_running() {
   local pid=""
   [[ -f $operation_file ]] || return 1
@@ -35,9 +30,8 @@ operation_running() {
 }
 
 detect_status() {
-  local active_state="inactive" executable="" executable_path=""
-  local label="Not installed" load_state="not-found" state="missing"
-  local unit_file_state="not-found"
+  local executable="" executable_path=""
+  local label="Not installed" state="missing"
 
   executable="$(command -v syncthing 2>/dev/null || true)"
   if [[ -n $executable ]]; then
@@ -45,18 +39,10 @@ detect_status() {
     [[ -n $executable_path ]] || executable_path="$executable"
   fi
 
-  load_state="$(service_property LoadState)"
-  active_state="$(service_property ActiveState)"
-  unit_file_state="$(service_property UnitFileState)"
-  [[ -n $load_state ]] || load_state="not-found"
-  [[ -n $active_state ]] || active_state="inactive"
-  [[ -n $unit_file_state ]] || unit_file_state="not-found"
-
   if [[ -n $executable_path ]]; then
     state="existing"
     label="Existing installation found: working"
-  elif [[ $load_state != not-found ||
-          -e $bin_link || -L $bin_link || -e $service_file ||
+  elif [[ -e $bin_link || -L $bin_link || -e $service_file ||
           -L $service_file ]]; then
     state="incomplete"
     label="Incomplete installation: non-working"
@@ -66,22 +52,12 @@ detect_status() {
     --arg state "$state" \
     --arg label "$label" \
     --arg executable "$executable_path" \
-    --arg serviceActiveState "$active_state" \
-    --arg unitFileState "$unit_file_state" \
-    --argjson serviceAvailable \
-      "$([[ $load_state != not-found ]] && echo true || echo false)" \
-    --argjson serviceRunning \
-      "$([[ $active_state == active ]] && echo true || echo false)" \
     --argjson operationRunning \
       "$(operation_running && echo true || echo false)" \
     '{
       state: $state,
       label: $label,
       executable: $executable,
-      serviceAvailable: $serviceAvailable,
-      serviceRunning: $serviceRunning,
-      serviceActiveState: $serviceActiveState,
-      unitFileState: $unitFileState,
       operationRunning: $operationRunning
     }'
 }

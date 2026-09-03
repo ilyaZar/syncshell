@@ -41,7 +41,7 @@ ShellRoot {
 
   StandaloneService {
     id: service
-    corePath: root.localPath(Qt.resolvedUrl("tests/core-process-mock.sh"))
+    pluginRoot: Quickshell.env("SYNCSHELL_TEST_PLUGIN_ROOT") || ""
 
     onRevisionChanged: root.startActions()
     onProtocolReadyChanged: root.startActions()

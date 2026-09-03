@@ -1,11 +1,16 @@
 import QtQuick
+import Quickshell
 import Quickshell.Io
 
 QtObject {
   id: root
 
-  required property string corePath
+  required property string pluginRoot
   property var startupArguments: []
+  property string architecture: ""
+  property string corePath: ""
+  property bool executableReady: false
+  property bool starting: true
   property bool desiredRunning: true
   property bool protocolReady: false
   property bool incompatible: false
@@ -24,12 +29,14 @@ QtObject {
   property var _pending: ({})
   property bool _expectedStop: false
   property bool _restartRequested: false
+  property string _architectureOutput: ""
+  property string _executableOutput: ""
 
   signal resultReceived(string id, bool ok, int revision, var data, var error)
   signal protocolFailed(string message)
 
   function start() {
-    if (!corePath || incompatible) return false
+    if (!executableReady || incompatible) return false
     _expectedStop = false
     desiredRunning = true
     return true
@@ -43,7 +50,7 @@ QtObject {
   }
 
   function restart() {
-    if (!corePath) return false
+    if (!executableReady) return false
     _restartRequested = true
     _expectedStop = true
     if (coreProcess.running) {
@@ -208,6 +215,14 @@ QtObject {
     }
   }
 
+  function inspectExecutable() {
+    corePath = pluginRoot + "/bin/x86_64/syncshell-core"
+    _executableOutput = ""
+    executableProcess.running = true
+  }
+
+  Component.onCompleted: architectureProcess.running = true
+
   Component.onDestruction: {
     _expectedStop = true
     desiredRunning = false
@@ -216,7 +231,7 @@ QtObject {
 
   property Process coreProcess: Process {
     command: [root.corePath, "stream"].concat(root.startupArguments || [])
-    running: root.desiredRunning && root.corePath !== "" && !root.incompatible
+    running: root.desiredRunning && root.executableReady && !root.incompatible
     stdinEnabled: true
 
     stdout: SplitParser {
@@ -244,6 +259,51 @@ QtObject {
     }
 
     onExited: function(exitCode) { root.handleExit(exitCode) }
+  }
+
+  property Process architectureProcess: Process {
+    command: ["/usr/bin/uname", "-m"]
+
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: root._architectureOutput = text
+    }
+
+    onExited: function(exitCode) {
+      root.architecture = String(root._architectureOutput || "").trim()
+      if (exitCode !== 0 || root.architecture !== "x86_64") {
+        root.starting = false
+        root.unavailable = true
+        root.lastError = root.architecture
+          ? "unsupported architecture: " + root.architecture
+          : "could not determine system architecture"
+        return
+      }
+      root.inspectExecutable()
+    }
+  }
+
+  property Process executableProcess: Process {
+    command: ["/usr/bin/find", root.corePath, "-maxdepth", "0", "-type", "f",
+      "-executable", "-print"]
+
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: root._executableOutput = text
+    }
+
+    onExited: function(exitCode) {
+      root.starting = false
+      if (exitCode !== 0
+          || String(root._executableOutput || "").trim() !== root.corePath) {
+        root.unavailable = true
+        root.lastError = "bundled native core is unavailable"
+        return
+      }
+      root.executableReady = true
+      root.unavailable = false
+      root.lastError = ""
+    }
   }
 
   property Timer restartTimer: Timer {

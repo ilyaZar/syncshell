@@ -20,10 +20,10 @@ QtObject {
     Qt.resolvedUrl("../scripts/syncthing-theme.sh"))
   readonly property string removeHelperPath: localPath(
     Qt.resolvedUrl("../scripts/syncthing-remove.sh"))
-  readonly property string pluginRoot: localPath(Qt.resolvedUrl(".."))
+  readonly property string pluginRoot: localPath(Qt.resolvedUrl("../../.."))
 
-  property var requestApi
-  property bool apiReady: false
+  property var selectTheme
+  property bool runtimeReady: false
   property bool legacyThemedIcon: false
   property bool settingsExists: false
   property string iconStyle: SettingsModel.DefaultIconStyle
@@ -129,38 +129,24 @@ QtObject {
   }
 
   function requestSelfRemoval(deletePluginSettings) {
-    if (!apiReady || !requestApi || busy) {
+    if (!runtimeReady || !selectTheme || busy) {
       error = "Syncthing must be available for clean removal"
       return
     }
     busy = true
     error = ""
     _deleteSettingsAfterRemoval = deletePluginSettings === true
-    requestApi("getSystemPaths", {}, function(paths) {
-      root.guiAssetsPath = String((paths || {}).guiAssets || "")
-      if (!root.guiAssetsPath) {
-        root.finishRemoval("Syncthing did not report its GUI assets path")
-        return
-      }
-      root.requestApi("getGuiConfig", {}, function(gui) {
-        var theme = String((gui || {}).theme || "default")
-        if (theme === "syncthing-omarchy") {
-          root.requestApi("patchGuiConfig", {
-            method: "PATCH",
-            json: { theme: "default" }
-          }, function() {
-            root.currentWebUiTheme = "default"
-            root.startRemovalWorker()
-          }, function(apiError) {
-            root.finishRemoval(root.apiErrorMessage(apiError))
-          })
-        } else root.startRemovalWorker()
-      }, function(apiError) {
-        root.finishRemoval(root.apiErrorMessage(apiError))
+    if (!guiAssetsPath) {
+      finishRemoval("Syncthing did not report its GUI assets path")
+      return
+    }
+    if (currentWebUiTheme === "syncthing-omarchy") {
+      selectTheme("default", function() {
+        root.startRemovalWorker()
+      }, function(actionError) {
+        root.finishRemoval(root.apiErrorMessage(actionError))
       })
-    }, function(apiError) {
-      root.finishRemoval(root.apiErrorMessage(apiError))
-    })
+    } else startRemovalWorker()
   }
 
   function startRemovalWorker() {
@@ -177,12 +163,12 @@ QtObject {
   }
 
   function scheduleReconcile() {
-    if (!_settingsLoaded || !_settingsValid || !apiReady) return
+    if (!_settingsLoaded || !_settingsValid || !runtimeReady) return
     reconcileTimer.restart()
   }
 
   function reconcile() {
-    if (!_settingsLoaded || !_settingsValid || !apiReady || !requestApi) return
+    if (!_settingsLoaded || !_settingsValid || !runtimeReady || !selectTheme) return
     if (_reconciling || themeProcess.running) {
       _reconcileAgain = true
       return
@@ -190,21 +176,11 @@ QtObject {
     error = ""
     _reconciling = true
     busy = true
-    requestApi("getSystemPaths", {}, function(paths) {
-      root.guiAssetsPath = String((paths || {}).guiAssets || "")
-      if (!root.guiAssetsPath) {
-        root.finishReconcile("Syncthing did not report its GUI assets path")
-        return
-      }
-      root.requestApi("getGuiConfig", {}, function(gui) {
-        root.currentWebUiTheme = String((gui || {}).theme || "default")
-        root.applyDesiredTheme()
-      }, function(apiError) {
-        root.finishReconcile(root.apiErrorMessage(apiError))
-      })
-    }, function(apiError) {
-      root.finishReconcile(root.apiErrorMessage(apiError))
-    })
+    if (!guiAssetsPath) {
+      finishReconcile("Syncthing did not report its GUI assets path")
+      return
+    }
+    applyDesiredTheme()
   }
 
   function applyDesiredTheme() {
@@ -230,17 +206,13 @@ QtObject {
   }
 
   function setSyncthingTheme(theme) {
-    requestApi("patchGuiConfig", {
-      method: "PATCH",
-      json: { theme: theme }
-    }, function() {
-      root.currentWebUiTheme = theme
+    selectTheme(theme, function() {
       root.notice = theme === "syncthing-omarchy"
         ? "Omarchy Web UI theme applied"
         : "Syncthing default Web UI theme restored"
       root.finishReconcile("")
-    }, function(apiError) {
-      root.finishReconcile(root.apiErrorMessage(apiError))
+    }, function(actionError) {
+      root.finishReconcile(root.apiErrorMessage(actionError))
     })
   }
 
@@ -259,7 +231,9 @@ QtObject {
     }
   }
 
-  onApiReadyChanged: scheduleReconcile()
+  onRuntimeReadyChanged: scheduleReconcile()
+  onCurrentWebUiThemeChanged: scheduleReconcile()
+  onGuiAssetsPathChanged: scheduleReconcile()
   onLegacyThemedIconChanged: {
     if (!settingsExists) iconStyle = legacyThemedIcon ? "themed" : "branded"
   }

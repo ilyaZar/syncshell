@@ -585,20 +585,16 @@ Panel {
 
         // Keep the effect warm under the brand icon for reliable live switches.
         MonoIcon {
-          anchors.centerIn: parent
-          width: Style.space(12)
-          height: width
+          anchors.fill: parent
           source: root.themedIconSource
           tint: button.foreground
         }
 
         Image {
-          anchors.centerIn: parent
-          width: Style.space(12)
-          height: width
+          anchors.fill: parent
           source: root.syncthingIconSource
-          sourceSize.width: 32
-          sourceSize.height: 32
+          sourceSize.width: width
+          sourceSize.height: height
           fillMode: Image.PreserveAspectFit
           smooth: true
           visible: !root.themedIcon

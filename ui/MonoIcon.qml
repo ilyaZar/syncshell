@@ -11,8 +11,8 @@ Item {
     id: image
     anchors.fill: parent
     source: root.source
-    sourceSize.width: Math.round(width * Screen.devicePixelRatio)
-    sourceSize.height: Math.round(height * Screen.devicePixelRatio)
+    sourceSize.width: width
+    sourceSize.height: height
     fillMode: Image.PreserveAspectFit
     smooth: true
     visible: false

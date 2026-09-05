@@ -589,9 +589,6 @@ Panel {
           width: Style.space(12)
           height: width
           source: root.themedIconSource
-          // Not root.foreground: on a transparent bar the host adapts the
-          // icon color to the wallpaper behind it, and every other bar icon
-          // picks that up through WidgetButton's own foreground property.
           tint: button.foreground
         }
 
